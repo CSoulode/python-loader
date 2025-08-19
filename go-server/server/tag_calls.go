@@ -437,3 +437,87 @@ FROM
 		return nil, status.Errorf(codes.InvalidArgument, "Invalid tag type provided: range is 1-5")
 	}
 }
+
+func (s *DataLoaderServer) ChangeTagName(ctx context.Context, request *pb.ChangeTagNameRequest) (*pb.Empty, error) {
+	// Validate the request
+	if request == nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Request cannot be nil")
+	}
+
+	// Retrieve the old tag name and tagset name before updating
+	var oldName string
+	query := "SELECT name FROM public."
+	switch request.TagTypeId {
+	case 1:
+		query += "alphanumerical_tags WHERE id = $1"
+	case 2:
+		query += "timestamp_tags WHERE id = $1"
+	case 3:
+		query += "time_tags WHERE id = $1"
+	case 4:
+		query += "date_tags WHERE id = $1"
+	case 5:
+		query += "numerical_tags WHERE id = $1"
+	default:
+		return nil, status.Errorf(codes.InvalidArgument, "Invalid tag type provided: range is 1-5")
+	}
+	err := s.db.QueryRow(query, request.TagId).Scan(&oldName)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Failed to fetch old tag name: %s", err)
+	}
+	var tagsetName string
+	err = s.db.QueryRow("SELECT name FROM public.tagsets WHERE id = $1", request.TagSetId).Scan(&tagsetName)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Failed to fetch tagset name: %s", err)
+	}
+
+	// Build the query
+	queryString := "UPDATE public."
+	var body string
+	switch request.TagTypeId {
+	case 1:
+		queryString += "alphanumerical_tags SET name = $1 WHERE id = $2"
+		_, err = s.db.Exec(queryString, request.GetNewAlphanumerical().Value, request.TagId)
+		body = fmt.Sprintf(`{
+			"OldName": "%s",
+			"NewName": "%s"
+			}`, oldName, request.GetNewAlphanumerical().Value)
+	case 2:
+		queryString += "timestamp_tags SET name = $1 WHERE id = $2"
+		_, err = s.db.Exec(queryString, request.GetNewTimestamp().Value, request.TagId)
+		body = fmt.Sprintf(`{
+			"OldName": "%s",
+			"NewName": "%s"
+			}`, oldName, request.GetNewTimestamp().Value)
+	case 3:
+		queryString += "time_tags SET name = $1 WHERE id = $2"
+		_, err = s.db.Exec(queryString, request.GetNewTime().Value, request.TagId)
+		body = fmt.Sprintf(`{
+			"OldName": "%s",
+			"NewName": "%s"
+			}`, oldName, request.GetNewTime().Value)
+	case 4:
+		queryString += "date_tags SET name = $1 WHERE id = $2"
+		_, err = s.db.Exec(queryString, request.GetNewDate().Value, request.TagId)
+		body = fmt.Sprintf(`{
+			"OldName": "%s",
+			"NewName": "%s"
+			}`, oldName, request.GetNewDate().Value)
+	case 5:
+		queryString += "numerical_tags SET name = $1 WHERE id = $2"
+		_, err = s.db.Exec(queryString, request.GetNewNumerical().Value, request.TagId)
+		body = fmt.Sprintf(`{
+			"OldName": "%s",
+			"NewName": "%d"
+			}`, oldName, request.GetNewNumerical().Value)
+	default:
+		return nil, status.Errorf(codes.InvalidArgument, "Invalid tag type provided: range is 1-5")
+	}
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Failed to update tag in database: %s", err)
+	}
+
+	rmq.PublishMessage(prod, body, fmt.Sprintf("tag_update.%s", tagsetName))
+
+	return &pb.Empty{}, nil
+}

@@ -9,35 +9,16 @@ import (
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	gutils "m3.dataloader/utilities"
 )
 
 var (
-	rabbitMQHost = mustGetEnv("RABBITMQ_HOST")
-	rabbitMQPort = mustGetEnvInt("RABBITMQ_PORT")
-	rabbitMQUser = mustGetEnv("RABBITMQ_USER")
-	rabbitMQPass = mustGetEnv("RABBITMQ_PASS")
-	exchangeName = mustGetEnv("RABBITMQ_EXCHANGE_NAME")
+	rabbitMQHost = gutils.MustGetEnv("RABBITMQ_HOST")
+	rabbitMQPort = gutils.MustGetEnvInt("RABBITMQ_PORT")
+	rabbitMQUser = gutils.MustGetEnv("RABBITMQ_USER")
+	rabbitMQPass = gutils.MustGetEnv("RABBITMQ_PASS")
+	exchangeName = gutils.MustGetEnv("RABBITMQ_EXCHANGE_NAME")
 )
-
-func mustGetEnv(key string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		log.Fatalf("Environment variable %s is required but not set", key)
-	}
-	return value
-}
-
-func mustGetEnvInt(key string) int {
-	value := os.Getenv(key)
-	if value == "" {
-		log.Fatalf("Environment variable %s is required but not set", key)
-	}
-	v, err := strconv.Atoi(value)
-	if err != nil {
-		log.Fatalf("Environment variable %s must be an integer, got: %s", key, value)
-	}
-	return v
-}
 
 type Producer struct {
 	conn    *amqp.Connection
