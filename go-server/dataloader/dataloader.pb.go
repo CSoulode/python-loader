@@ -1657,6 +1657,160 @@ func (x *CreateTagStreamResponse) GetErrorMessage() string {
 	return ""
 }
 
+type ChangeTagNameRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	TagId     int64                  `protobuf:"varint,1,opt,name=tagId,proto3" json:"tagId,omitempty"`
+	TagTypeId int64                  `protobuf:"varint,2,opt,name=tagTypeId,proto3" json:"tagTypeId,omitempty"`
+	TagSetId  int64                  `protobuf:"varint,3,opt,name=tagSetId,proto3" json:"tagSetId,omitempty"`
+	// Types that are valid to be assigned to NewName:
+	//
+	//	*ChangeTagNameRequest_NewAlphanumerical
+	//	*ChangeTagNameRequest_NewTimestamp
+	//	*ChangeTagNameRequest_NewTime
+	//	*ChangeTagNameRequest_NewDate
+	//	*ChangeTagNameRequest_NewNumerical
+	NewName       isChangeTagNameRequest_NewName `protobuf_oneof:"newName"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChangeTagNameRequest) Reset() {
+	*x = ChangeTagNameRequest{}
+	mi := &file_dataloader_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChangeTagNameRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChangeTagNameRequest) ProtoMessage() {}
+
+func (x *ChangeTagNameRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dataloader_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChangeTagNameRequest.ProtoReflect.Descriptor instead.
+func (*ChangeTagNameRequest) Descriptor() ([]byte, []int) {
+	return file_dataloader_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *ChangeTagNameRequest) GetTagId() int64 {
+	if x != nil {
+		return x.TagId
+	}
+	return 0
+}
+
+func (x *ChangeTagNameRequest) GetTagTypeId() int64 {
+	if x != nil {
+		return x.TagTypeId
+	}
+	return 0
+}
+
+func (x *ChangeTagNameRequest) GetTagSetId() int64 {
+	if x != nil {
+		return x.TagSetId
+	}
+	return 0
+}
+
+func (x *ChangeTagNameRequest) GetNewName() isChangeTagNameRequest_NewName {
+	if x != nil {
+		return x.NewName
+	}
+	return nil
+}
+
+func (x *ChangeTagNameRequest) GetNewAlphanumerical() *AlphanumericalValue {
+	if x != nil {
+		if x, ok := x.NewName.(*ChangeTagNameRequest_NewAlphanumerical); ok {
+			return x.NewAlphanumerical
+		}
+	}
+	return nil
+}
+
+func (x *ChangeTagNameRequest) GetNewTimestamp() *TimeStampValue {
+	if x != nil {
+		if x, ok := x.NewName.(*ChangeTagNameRequest_NewTimestamp); ok {
+			return x.NewTimestamp
+		}
+	}
+	return nil
+}
+
+func (x *ChangeTagNameRequest) GetNewTime() *TimeValue {
+	if x != nil {
+		if x, ok := x.NewName.(*ChangeTagNameRequest_NewTime); ok {
+			return x.NewTime
+		}
+	}
+	return nil
+}
+
+func (x *ChangeTagNameRequest) GetNewDate() *DateValue {
+	if x != nil {
+		if x, ok := x.NewName.(*ChangeTagNameRequest_NewDate); ok {
+			return x.NewDate
+		}
+	}
+	return nil
+}
+
+func (x *ChangeTagNameRequest) GetNewNumerical() *NumericalValue {
+	if x != nil {
+		if x, ok := x.NewName.(*ChangeTagNameRequest_NewNumerical); ok {
+			return x.NewNumerical
+		}
+	}
+	return nil
+}
+
+type isChangeTagNameRequest_NewName interface {
+	isChangeTagNameRequest_NewName()
+}
+
+type ChangeTagNameRequest_NewAlphanumerical struct {
+	NewAlphanumerical *AlphanumericalValue `protobuf:"bytes,4,opt,name=newAlphanumerical,proto3,oneof"`
+}
+
+type ChangeTagNameRequest_NewTimestamp struct {
+	NewTimestamp *TimeStampValue `protobuf:"bytes,5,opt,name=newTimestamp,proto3,oneof"`
+}
+
+type ChangeTagNameRequest_NewTime struct {
+	NewTime *TimeValue `protobuf:"bytes,6,opt,name=newTime,proto3,oneof"`
+}
+
+type ChangeTagNameRequest_NewDate struct {
+	NewDate *DateValue `protobuf:"bytes,7,opt,name=newDate,proto3,oneof"`
+}
+
+type ChangeTagNameRequest_NewNumerical struct {
+	NewNumerical *NumericalValue `protobuf:"bytes,8,opt,name=newNumerical,proto3,oneof"`
+}
+
+func (*ChangeTagNameRequest_NewAlphanumerical) isChangeTagNameRequest_NewName() {}
+
+func (*ChangeTagNameRequest_NewTimestamp) isChangeTagNameRequest_NewName() {}
+
+func (*ChangeTagNameRequest_NewTime) isChangeTagNameRequest_NewName() {}
+
+func (*ChangeTagNameRequest_NewDate) isChangeTagNameRequest_NewName() {}
+
+func (*ChangeTagNameRequest_NewNumerical) isChangeTagNameRequest_NewName() {}
+
 type Tagging struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	MediaId       int64                  `protobuf:"varint,1,opt,name=mediaId,proto3" json:"mediaId,omitempty"`
@@ -1667,7 +1821,7 @@ type Tagging struct {
 
 func (x *Tagging) Reset() {
 	*x = Tagging{}
-	mi := &file_dataloader_proto_msgTypes[25]
+	mi := &file_dataloader_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1679,7 +1833,7 @@ func (x *Tagging) String() string {
 func (*Tagging) ProtoMessage() {}
 
 func (x *Tagging) ProtoReflect() protoreflect.Message {
-	mi := &file_dataloader_proto_msgTypes[25]
+	mi := &file_dataloader_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1692,7 +1846,7 @@ func (x *Tagging) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Tagging.ProtoReflect.Descriptor instead.
 func (*Tagging) Descriptor() ([]byte, []int) {
-	return file_dataloader_proto_rawDescGZIP(), []int{25}
+	return file_dataloader_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *Tagging) GetMediaId() int64 {
@@ -1719,7 +1873,7 @@ type CreateTaggingRequest struct {
 
 func (x *CreateTaggingRequest) Reset() {
 	*x = CreateTaggingRequest{}
-	mi := &file_dataloader_proto_msgTypes[26]
+	mi := &file_dataloader_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1731,7 +1885,7 @@ func (x *CreateTaggingRequest) String() string {
 func (*CreateTaggingRequest) ProtoMessage() {}
 
 func (x *CreateTaggingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dataloader_proto_msgTypes[26]
+	mi := &file_dataloader_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1744,7 +1898,7 @@ func (x *CreateTaggingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTaggingRequest.ProtoReflect.Descriptor instead.
 func (*CreateTaggingRequest) Descriptor() ([]byte, []int) {
-	return file_dataloader_proto_rawDescGZIP(), []int{26}
+	return file_dataloader_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *CreateTaggingRequest) GetMediaId() int64 {
@@ -1774,7 +1928,7 @@ type StreamingTaggingResponse struct {
 
 func (x *StreamingTaggingResponse) Reset() {
 	*x = StreamingTaggingResponse{}
-	mi := &file_dataloader_proto_msgTypes[27]
+	mi := &file_dataloader_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1786,7 +1940,7 @@ func (x *StreamingTaggingResponse) String() string {
 func (*StreamingTaggingResponse) ProtoMessage() {}
 
 func (x *StreamingTaggingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dataloader_proto_msgTypes[27]
+	mi := &file_dataloader_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1799,7 +1953,7 @@ func (x *StreamingTaggingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamingTaggingResponse.ProtoReflect.Descriptor instead.
 func (*StreamingTaggingResponse) Descriptor() ([]byte, []int) {
-	return file_dataloader_proto_rawDescGZIP(), []int{27}
+	return file_dataloader_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *StreamingTaggingResponse) GetMessage() isStreamingTaggingResponse_Message {
@@ -1856,7 +2010,7 @@ type CreateTaggingStreamResponse struct {
 
 func (x *CreateTaggingStreamResponse) Reset() {
 	*x = CreateTaggingStreamResponse{}
-	mi := &file_dataloader_proto_msgTypes[28]
+	mi := &file_dataloader_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1868,7 +2022,7 @@ func (x *CreateTaggingStreamResponse) String() string {
 func (*CreateTaggingStreamResponse) ProtoMessage() {}
 
 func (x *CreateTaggingStreamResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dataloader_proto_msgTypes[28]
+	mi := &file_dataloader_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1881,7 +2035,7 @@ func (x *CreateTaggingStreamResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTaggingStreamResponse.ProtoReflect.Descriptor instead.
 func (*CreateTaggingStreamResponse) Descriptor() ([]byte, []int) {
-	return file_dataloader_proto_rawDescGZIP(), []int{28}
+	return file_dataloader_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *CreateTaggingStreamResponse) GetMessage() isCreateTaggingStreamResponse_Message {
@@ -1925,6 +2079,168 @@ func (*CreateTaggingStreamResponse_Count) isCreateTaggingStreamResponse_Message(
 
 func (*CreateTaggingStreamResponse_Error) isCreateTaggingStreamResponse_Message() {}
 
+type ChangeTaggingRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	MediaId   int64                  `protobuf:"varint,1,opt,name=mediaId,proto3" json:"mediaId,omitempty"`
+	TagSetId  int64                  `protobuf:"varint,2,opt,name=tagSetId,proto3" json:"tagSetId,omitempty"`
+	TagId     int64                  `protobuf:"varint,3,opt,name=tagId,proto3" json:"tagId,omitempty"`
+	TagTypeId int64                  `protobuf:"varint,4,opt,name=tagTypeId,proto3" json:"tagTypeId,omitempty"`
+	// Types that are valid to be assigned to NewName:
+	//
+	//	*ChangeTaggingRequest_Alphanumerical
+	//	*ChangeTaggingRequest_Timestamp
+	//	*ChangeTaggingRequest_Time
+	//	*ChangeTaggingRequest_Date
+	//	*ChangeTaggingRequest_Numerical
+	NewName       isChangeTaggingRequest_NewName `protobuf_oneof:"newName"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChangeTaggingRequest) Reset() {
+	*x = ChangeTaggingRequest{}
+	mi := &file_dataloader_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChangeTaggingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChangeTaggingRequest) ProtoMessage() {}
+
+func (x *ChangeTaggingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dataloader_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChangeTaggingRequest.ProtoReflect.Descriptor instead.
+func (*ChangeTaggingRequest) Descriptor() ([]byte, []int) {
+	return file_dataloader_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *ChangeTaggingRequest) GetMediaId() int64 {
+	if x != nil {
+		return x.MediaId
+	}
+	return 0
+}
+
+func (x *ChangeTaggingRequest) GetTagSetId() int64 {
+	if x != nil {
+		return x.TagSetId
+	}
+	return 0
+}
+
+func (x *ChangeTaggingRequest) GetTagId() int64 {
+	if x != nil {
+		return x.TagId
+	}
+	return 0
+}
+
+func (x *ChangeTaggingRequest) GetTagTypeId() int64 {
+	if x != nil {
+		return x.TagTypeId
+	}
+	return 0
+}
+
+func (x *ChangeTaggingRequest) GetNewName() isChangeTaggingRequest_NewName {
+	if x != nil {
+		return x.NewName
+	}
+	return nil
+}
+
+func (x *ChangeTaggingRequest) GetAlphanumerical() *AlphanumericalValue {
+	if x != nil {
+		if x, ok := x.NewName.(*ChangeTaggingRequest_Alphanumerical); ok {
+			return x.Alphanumerical
+		}
+	}
+	return nil
+}
+
+func (x *ChangeTaggingRequest) GetTimestamp() *TimeStampValue {
+	if x != nil {
+		if x, ok := x.NewName.(*ChangeTaggingRequest_Timestamp); ok {
+			return x.Timestamp
+		}
+	}
+	return nil
+}
+
+func (x *ChangeTaggingRequest) GetTime() *TimeValue {
+	if x != nil {
+		if x, ok := x.NewName.(*ChangeTaggingRequest_Time); ok {
+			return x.Time
+		}
+	}
+	return nil
+}
+
+func (x *ChangeTaggingRequest) GetDate() *DateValue {
+	if x != nil {
+		if x, ok := x.NewName.(*ChangeTaggingRequest_Date); ok {
+			return x.Date
+		}
+	}
+	return nil
+}
+
+func (x *ChangeTaggingRequest) GetNumerical() *NumericalValue {
+	if x != nil {
+		if x, ok := x.NewName.(*ChangeTaggingRequest_Numerical); ok {
+			return x.Numerical
+		}
+	}
+	return nil
+}
+
+type isChangeTaggingRequest_NewName interface {
+	isChangeTaggingRequest_NewName()
+}
+
+type ChangeTaggingRequest_Alphanumerical struct {
+	Alphanumerical *AlphanumericalValue `protobuf:"bytes,5,opt,name=alphanumerical,proto3,oneof"`
+}
+
+type ChangeTaggingRequest_Timestamp struct {
+	Timestamp *TimeStampValue `protobuf:"bytes,6,opt,name=timestamp,proto3,oneof"`
+}
+
+type ChangeTaggingRequest_Time struct {
+	Time *TimeValue `protobuf:"bytes,7,opt,name=time,proto3,oneof"`
+}
+
+type ChangeTaggingRequest_Date struct {
+	Date *DateValue `protobuf:"bytes,8,opt,name=date,proto3,oneof"`
+}
+
+type ChangeTaggingRequest_Numerical struct {
+	Numerical *NumericalValue `protobuf:"bytes,9,opt,name=numerical,proto3,oneof"`
+}
+
+func (*ChangeTaggingRequest_Alphanumerical) isChangeTaggingRequest_NewName() {}
+
+func (*ChangeTaggingRequest_Timestamp) isChangeTaggingRequest_NewName() {}
+
+func (*ChangeTaggingRequest_Time) isChangeTaggingRequest_NewName() {}
+
+func (*ChangeTaggingRequest_Date) isChangeTaggingRequest_NewName() {}
+
+func (*ChangeTaggingRequest_Numerical) isChangeTaggingRequest_NewName() {}
+
 // Hierarchies
 type Hierarchy struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1938,7 +2254,7 @@ type Hierarchy struct {
 
 func (x *Hierarchy) Reset() {
 	*x = Hierarchy{}
-	mi := &file_dataloader_proto_msgTypes[29]
+	mi := &file_dataloader_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1950,7 +2266,7 @@ func (x *Hierarchy) String() string {
 func (*Hierarchy) ProtoMessage() {}
 
 func (x *Hierarchy) ProtoReflect() protoreflect.Message {
-	mi := &file_dataloader_proto_msgTypes[29]
+	mi := &file_dataloader_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1963,7 +2279,7 @@ func (x *Hierarchy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Hierarchy.ProtoReflect.Descriptor instead.
 func (*Hierarchy) Descriptor() ([]byte, []int) {
-	return file_dataloader_proto_rawDescGZIP(), []int{29}
+	return file_dataloader_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *Hierarchy) GetId() int64 {
@@ -2003,7 +2319,7 @@ type GetHierarchiesRequest struct {
 
 func (x *GetHierarchiesRequest) Reset() {
 	*x = GetHierarchiesRequest{}
-	mi := &file_dataloader_proto_msgTypes[30]
+	mi := &file_dataloader_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2015,7 +2331,7 @@ func (x *GetHierarchiesRequest) String() string {
 func (*GetHierarchiesRequest) ProtoMessage() {}
 
 func (x *GetHierarchiesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dataloader_proto_msgTypes[30]
+	mi := &file_dataloader_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2028,7 +2344,7 @@ func (x *GetHierarchiesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetHierarchiesRequest.ProtoReflect.Descriptor instead.
 func (*GetHierarchiesRequest) Descriptor() ([]byte, []int) {
-	return file_dataloader_proto_rawDescGZIP(), []int{30}
+	return file_dataloader_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *GetHierarchiesRequest) GetTagSetId() int64 {
@@ -2048,7 +2364,7 @@ type CreateHierarchyRequest struct {
 
 func (x *CreateHierarchyRequest) Reset() {
 	*x = CreateHierarchyRequest{}
-	mi := &file_dataloader_proto_msgTypes[31]
+	mi := &file_dataloader_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2060,7 +2376,7 @@ func (x *CreateHierarchyRequest) String() string {
 func (*CreateHierarchyRequest) ProtoMessage() {}
 
 func (x *CreateHierarchyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dataloader_proto_msgTypes[31]
+	mi := &file_dataloader_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2073,7 +2389,7 @@ func (x *CreateHierarchyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateHierarchyRequest.ProtoReflect.Descriptor instead.
 func (*CreateHierarchyRequest) Descriptor() ([]byte, []int) {
-	return file_dataloader_proto_rawDescGZIP(), []int{31}
+	return file_dataloader_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *CreateHierarchyRequest) GetName() string {
@@ -2103,7 +2419,7 @@ type StreamingHierarchyResponse struct {
 
 func (x *StreamingHierarchyResponse) Reset() {
 	*x = StreamingHierarchyResponse{}
-	mi := &file_dataloader_proto_msgTypes[32]
+	mi := &file_dataloader_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2115,7 +2431,7 @@ func (x *StreamingHierarchyResponse) String() string {
 func (*StreamingHierarchyResponse) ProtoMessage() {}
 
 func (x *StreamingHierarchyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dataloader_proto_msgTypes[32]
+	mi := &file_dataloader_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2128,7 +2444,7 @@ func (x *StreamingHierarchyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamingHierarchyResponse.ProtoReflect.Descriptor instead.
 func (*StreamingHierarchyResponse) Descriptor() ([]byte, []int) {
-	return file_dataloader_proto_rawDescGZIP(), []int{32}
+	return file_dataloader_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *StreamingHierarchyResponse) GetMessage() isStreamingHierarchyResponse_Message {
@@ -2185,7 +2501,7 @@ type Node struct {
 
 func (x *Node) Reset() {
 	*x = Node{}
-	mi := &file_dataloader_proto_msgTypes[33]
+	mi := &file_dataloader_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2197,7 +2513,7 @@ func (x *Node) String() string {
 func (*Node) ProtoMessage() {}
 
 func (x *Node) ProtoReflect() protoreflect.Message {
-	mi := &file_dataloader_proto_msgTypes[33]
+	mi := &file_dataloader_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2210,7 +2526,7 @@ func (x *Node) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Node.ProtoReflect.Descriptor instead.
 func (*Node) Descriptor() ([]byte, []int) {
-	return file_dataloader_proto_rawDescGZIP(), []int{33}
+	return file_dataloader_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *Node) GetId() int64 {
@@ -2252,7 +2568,7 @@ type CreateNodeRequest struct {
 
 func (x *CreateNodeRequest) Reset() {
 	*x = CreateNodeRequest{}
-	mi := &file_dataloader_proto_msgTypes[34]
+	mi := &file_dataloader_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2264,7 +2580,7 @@ func (x *CreateNodeRequest) String() string {
 func (*CreateNodeRequest) ProtoMessage() {}
 
 func (x *CreateNodeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dataloader_proto_msgTypes[34]
+	mi := &file_dataloader_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2277,7 +2593,7 @@ func (x *CreateNodeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateNodeRequest.ProtoReflect.Descriptor instead.
 func (*CreateNodeRequest) Descriptor() ([]byte, []int) {
-	return file_dataloader_proto_rawDescGZIP(), []int{34}
+	return file_dataloader_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *CreateNodeRequest) GetTagId() int64 {
@@ -2312,7 +2628,7 @@ type GetNodesRequest struct {
 
 func (x *GetNodesRequest) Reset() {
 	*x = GetNodesRequest{}
-	mi := &file_dataloader_proto_msgTypes[35]
+	mi := &file_dataloader_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2324,7 +2640,7 @@ func (x *GetNodesRequest) String() string {
 func (*GetNodesRequest) ProtoMessage() {}
 
 func (x *GetNodesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dataloader_proto_msgTypes[35]
+	mi := &file_dataloader_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2337,7 +2653,7 @@ func (x *GetNodesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetNodesRequest.ProtoReflect.Descriptor instead.
 func (*GetNodesRequest) Descriptor() ([]byte, []int) {
-	return file_dataloader_proto_rawDescGZIP(), []int{35}
+	return file_dataloader_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *GetNodesRequest) GetTagId() int64 {
@@ -2374,7 +2690,7 @@ type StreamingNodeResponse struct {
 
 func (x *StreamingNodeResponse) Reset() {
 	*x = StreamingNodeResponse{}
-	mi := &file_dataloader_proto_msgTypes[36]
+	mi := &file_dataloader_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2386,7 +2702,7 @@ func (x *StreamingNodeResponse) String() string {
 func (*StreamingNodeResponse) ProtoMessage() {}
 
 func (x *StreamingNodeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dataloader_proto_msgTypes[36]
+	mi := &file_dataloader_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2399,7 +2715,7 @@ func (x *StreamingNodeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamingNodeResponse.ProtoReflect.Descriptor instead.
 func (*StreamingNodeResponse) Descriptor() ([]byte, []int) {
-	return file_dataloader_proto_rawDescGZIP(), []int{36}
+	return file_dataloader_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *StreamingNodeResponse) GetMessage() isStreamingNodeResponse_Message {
@@ -2541,7 +2857,17 @@ const file_dataloader_proto_rawDesc = "" +
 	"\n" +
 	"IdMapEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x03R\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\"9\n" +
+	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\"\xac\x03\n" +
+	"\x14ChangeTagNameRequest\x12\x14\n" +
+	"\x05tagId\x18\x01 \x01(\x03R\x05tagId\x12\x1c\n" +
+	"\ttagTypeId\x18\x02 \x01(\x03R\ttagTypeId\x12\x1a\n" +
+	"\btagSetId\x18\x03 \x01(\x03R\btagSetId\x12O\n" +
+	"\x11newAlphanumerical\x18\x04 \x01(\v2\x1f.dataloader.AlphanumericalValueH\x00R\x11newAlphanumerical\x12@\n" +
+	"\fnewTimestamp\x18\x05 \x01(\v2\x1a.dataloader.TimeStampValueH\x00R\fnewTimestamp\x121\n" +
+	"\anewTime\x18\x06 \x01(\v2\x15.dataloader.TimeValueH\x00R\anewTime\x121\n" +
+	"\anewDate\x18\a \x01(\v2\x15.dataloader.DateValueH\x00R\anewDate\x12@\n" +
+	"\fnewNumerical\x18\b \x01(\v2\x1a.dataloader.NumericalValueH\x00R\fnewNumericalB\t\n" +
+	"\anewName\"9\n" +
 	"\aTagging\x12\x18\n" +
 	"\amediaId\x18\x01 \x01(\x03R\amediaId\x12\x14\n" +
 	"\x05tagId\x18\x02 \x01(\x03R\x05tagId\"F\n" +
@@ -2555,7 +2881,18 @@ const file_dataloader_proto_rawDesc = "" +
 	"\x1bCreateTaggingStreamResponse\x12\x16\n" +
 	"\x05count\x18\x01 \x01(\x03H\x00R\x05count\x12*\n" +
 	"\x05error\x18\x02 \x01(\v2\x12.google.rpc.StatusH\x00R\x05errorB\t\n" +
-	"\amessage\"k\n" +
+	"\amessage\"\xa8\x03\n" +
+	"\x14ChangeTaggingRequest\x12\x18\n" +
+	"\amediaId\x18\x01 \x01(\x03R\amediaId\x12\x1a\n" +
+	"\btagSetId\x18\x02 \x01(\x03R\btagSetId\x12\x14\n" +
+	"\x05tagId\x18\x03 \x01(\x03R\x05tagId\x12\x1c\n" +
+	"\ttagTypeId\x18\x04 \x01(\x03R\ttagTypeId\x12I\n" +
+	"\x0ealphanumerical\x18\x05 \x01(\v2\x1f.dataloader.AlphanumericalValueH\x00R\x0ealphanumerical\x12:\n" +
+	"\ttimestamp\x18\x06 \x01(\v2\x1a.dataloader.TimeStampValueH\x00R\ttimestamp\x12+\n" +
+	"\x04time\x18\a \x01(\v2\x15.dataloader.TimeValueH\x00R\x04time\x12+\n" +
+	"\x04date\x18\b \x01(\v2\x15.dataloader.DateValueH\x00R\x04date\x12:\n" +
+	"\tnumerical\x18\t \x01(\v2\x1a.dataloader.NumericalValueH\x00R\tnumericalB\t\n" +
+	"\anewName\"k\n" +
 	"\tHierarchy\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n" +
@@ -2588,7 +2925,7 @@ const file_dataloader_proto_rawDesc = "" +
 	"\x15StreamingNodeResponse\x12&\n" +
 	"\x04node\x18\x01 \x01(\v2\x10.dataloader.NodeH\x00R\x04node\x12*\n" +
 	"\x05error\x18\x02 \x01(\v2\x12.google.rpc.StatusH\x00R\x05errorB\t\n" +
-	"\amessage2\x8e\x10\n" +
+	"\amessage2\x9e\x11\n" +
 	"\n" +
 	"DataLoader\x12Q\n" +
 	"\tgetMedias\x12\x1c.dataloader.GetMediasRequest\x1a\".dataloader.StreamingMediaResponse\"\x000\x01\x12:\n" +
@@ -2605,12 +2942,14 @@ const file_dataloader_proto_rawDesc = "" +
 	"\agetTags\x12\x1a.dataloader.GetTagsRequest\x1a .dataloader.StreamingTagResponse\"\x000\x01\x122\n" +
 	"\x06getTag\x12\x15.dataloader.IdRequest\x1a\x0f.dataloader.Tag\"\x00\x12<\n" +
 	"\tcreateTag\x12\x1c.dataloader.CreateTagRequest\x1a\x0f.dataloader.Tag\"\x00\x12`\n" +
-	"\x0fcreateTagStream\x12\".dataloader.CreateTagStreamRequest\x1a#.dataloader.CreateTagStreamResponse\"\x00(\x010\x01\x12J\n" +
+	"\x0fcreateTagStream\x12\".dataloader.CreateTagStreamRequest\x1a#.dataloader.CreateTagStreamResponse\"\x00(\x010\x01\x12F\n" +
+	"\rchangeTagName\x12 .dataloader.ChangeTagNameRequest\x1a\x11.dataloader.Empty\"\x00\x12J\n" +
 	"\vgetTaggings\x12\x11.dataloader.Empty\x1a$.dataloader.StreamingTaggingResponse\"\x000\x01\x12K\n" +
 	"\x10getMediasWithTag\x12\x15.dataloader.IdRequest\x1a\x1e.dataloader.RepeatedIdResponse\"\x00\x12G\n" +
 	"\fgetMediaTags\x12\x15.dataloader.IdRequest\x1a\x1e.dataloader.RepeatedIdResponse\"\x00\x12H\n" +
 	"\rcreateTagging\x12 .dataloader.CreateTaggingRequest\x1a\x13.dataloader.Tagging\"\x00\x12f\n" +
-	"\x13createTaggingStream\x12 .dataloader.CreateTaggingRequest\x1a'.dataloader.CreateTaggingStreamResponse\"\x00(\x010\x01\x12_\n" +
+	"\x13createTaggingStream\x12 .dataloader.CreateTaggingRequest\x1a'.dataloader.CreateTaggingStreamResponse\"\x00(\x010\x01\x12F\n" +
+	"\rchangeTagging\x12 .dataloader.ChangeTaggingRequest\x1a\x11.dataloader.Empty\"\x00\x12_\n" +
 	"\x0egetHierarchies\x12!.dataloader.GetHierarchiesRequest\x1a&.dataloader.StreamingHierarchyResponse\"\x000\x01\x12>\n" +
 	"\fgetHierarchy\x12\x15.dataloader.IdRequest\x1a\x15.dataloader.Hierarchy\"\x00\x12N\n" +
 	"\x0fcreateHierarchy\x12\".dataloader.CreateHierarchyRequest\x1a\x15.dataloader.Hierarchy\"\x00\x12N\n" +
@@ -2635,7 +2974,7 @@ func file_dataloader_proto_rawDescGZIP() []byte {
 	return file_dataloader_proto_rawDescData
 }
 
-var file_dataloader_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
+var file_dataloader_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
 var file_dataloader_proto_goTypes = []any{
 	(*Empty)(nil),                       // 0: dataloader.Empty
 	(*IdRequest)(nil),                   // 1: dataloader.IdRequest
@@ -2662,27 +3001,29 @@ var file_dataloader_proto_goTypes = []any{
 	(*StreamingTagResponse)(nil),        // 22: dataloader.StreamingTagResponse
 	(*CreateTagStreamRequest)(nil),      // 23: dataloader.CreateTagStreamRequest
 	(*CreateTagStreamResponse)(nil),     // 24: dataloader.CreateTagStreamResponse
-	(*Tagging)(nil),                     // 25: dataloader.Tagging
-	(*CreateTaggingRequest)(nil),        // 26: dataloader.CreateTaggingRequest
-	(*StreamingTaggingResponse)(nil),    // 27: dataloader.StreamingTaggingResponse
-	(*CreateTaggingStreamResponse)(nil), // 28: dataloader.CreateTaggingStreamResponse
-	(*Hierarchy)(nil),                   // 29: dataloader.Hierarchy
-	(*GetHierarchiesRequest)(nil),       // 30: dataloader.GetHierarchiesRequest
-	(*CreateHierarchyRequest)(nil),      // 31: dataloader.CreateHierarchyRequest
-	(*StreamingHierarchyResponse)(nil),  // 32: dataloader.StreamingHierarchyResponse
-	(*Node)(nil),                        // 33: dataloader.Node
-	(*CreateNodeRequest)(nil),           // 34: dataloader.CreateNodeRequest
-	(*GetNodesRequest)(nil),             // 35: dataloader.GetNodesRequest
-	(*StreamingNodeResponse)(nil),       // 36: dataloader.StreamingNodeResponse
-	nil,                                 // 37: dataloader.CreateTagStreamResponse.IdMapEntry
-	(*status.Status)(nil),               // 38: google.rpc.Status
+	(*ChangeTagNameRequest)(nil),        // 25: dataloader.ChangeTagNameRequest
+	(*Tagging)(nil),                     // 26: dataloader.Tagging
+	(*CreateTaggingRequest)(nil),        // 27: dataloader.CreateTaggingRequest
+	(*StreamingTaggingResponse)(nil),    // 28: dataloader.StreamingTaggingResponse
+	(*CreateTaggingStreamResponse)(nil), // 29: dataloader.CreateTaggingStreamResponse
+	(*ChangeTaggingRequest)(nil),        // 30: dataloader.ChangeTaggingRequest
+	(*Hierarchy)(nil),                   // 31: dataloader.Hierarchy
+	(*GetHierarchiesRequest)(nil),       // 32: dataloader.GetHierarchiesRequest
+	(*CreateHierarchyRequest)(nil),      // 33: dataloader.CreateHierarchyRequest
+	(*StreamingHierarchyResponse)(nil),  // 34: dataloader.StreamingHierarchyResponse
+	(*Node)(nil),                        // 35: dataloader.Node
+	(*CreateNodeRequest)(nil),           // 36: dataloader.CreateNodeRequest
+	(*GetNodesRequest)(nil),             // 37: dataloader.GetNodesRequest
+	(*StreamingNodeResponse)(nil),       // 38: dataloader.StreamingNodeResponse
+	nil,                                 // 39: dataloader.CreateTagStreamResponse.IdMapEntry
+	(*status.Status)(nil),               // 40: google.rpc.Status
 }
 var file_dataloader_proto_depIdxs = []int32{
 	4,  // 0: dataloader.StreamingMediaResponse.media:type_name -> dataloader.Media
-	38, // 1: dataloader.StreamingMediaResponse.error:type_name -> google.rpc.Status
-	38, // 2: dataloader.CreateMediaStreamResponse.error:type_name -> google.rpc.Status
+	40, // 1: dataloader.StreamingMediaResponse.error:type_name -> google.rpc.Status
+	40, // 2: dataloader.CreateMediaStreamResponse.error:type_name -> google.rpc.Status
 	9,  // 3: dataloader.StreamingTagSetResponse.tagset:type_name -> dataloader.TagSet
-	38, // 4: dataloader.StreamingTagSetResponse.error:type_name -> google.rpc.Status
+	40, // 4: dataloader.StreamingTagSetResponse.error:type_name -> google.rpc.Status
 	15, // 5: dataloader.Tag.alphanumerical:type_name -> dataloader.AlphanumericalValue
 	19, // 6: dataloader.Tag.timestamp:type_name -> dataloader.TimeStampValue
 	18, // 7: dataloader.Tag.time:type_name -> dataloader.TimeValue
@@ -2694,81 +3035,95 @@ var file_dataloader_proto_depIdxs = []int32{
 	17, // 13: dataloader.CreateTagRequest.date:type_name -> dataloader.DateValue
 	16, // 14: dataloader.CreateTagRequest.numerical:type_name -> dataloader.NumericalValue
 	14, // 15: dataloader.StreamingTagResponse.tag:type_name -> dataloader.Tag
-	38, // 16: dataloader.StreamingTagResponse.error:type_name -> google.rpc.Status
+	40, // 16: dataloader.StreamingTagResponse.error:type_name -> google.rpc.Status
 	15, // 17: dataloader.CreateTagStreamRequest.alphanumerical:type_name -> dataloader.AlphanumericalValue
 	19, // 18: dataloader.CreateTagStreamRequest.timestamp:type_name -> dataloader.TimeStampValue
 	18, // 19: dataloader.CreateTagStreamRequest.time:type_name -> dataloader.TimeValue
 	17, // 20: dataloader.CreateTagStreamRequest.date:type_name -> dataloader.DateValue
 	16, // 21: dataloader.CreateTagStreamRequest.numerical:type_name -> dataloader.NumericalValue
-	37, // 22: dataloader.CreateTagStreamResponse.id_map:type_name -> dataloader.CreateTagStreamResponse.IdMapEntry
-	25, // 23: dataloader.StreamingTaggingResponse.tagging:type_name -> dataloader.Tagging
-	38, // 24: dataloader.StreamingTaggingResponse.error:type_name -> google.rpc.Status
-	38, // 25: dataloader.CreateTaggingStreamResponse.error:type_name -> google.rpc.Status
-	29, // 26: dataloader.StreamingHierarchyResponse.hierarchy:type_name -> dataloader.Hierarchy
-	38, // 27: dataloader.StreamingHierarchyResponse.error:type_name -> google.rpc.Status
-	33, // 28: dataloader.StreamingNodeResponse.node:type_name -> dataloader.Node
-	38, // 29: dataloader.StreamingNodeResponse.error:type_name -> google.rpc.Status
-	5,  // 30: dataloader.DataLoader.getMedias:input_type -> dataloader.GetMediasRequest
-	1,  // 31: dataloader.DataLoader.getMediaById:input_type -> dataloader.IdRequest
-	6,  // 32: dataloader.DataLoader.getMediaByURI:input_type -> dataloader.GetMediaByURIRequest
-	4,  // 33: dataloader.DataLoader.createMedia:input_type -> dataloader.Media
-	4,  // 34: dataloader.DataLoader.createMediaStream:input_type -> dataloader.Media
-	1,  // 35: dataloader.DataLoader.deleteMedia:input_type -> dataloader.IdRequest
-	10, // 36: dataloader.DataLoader.getTagSets:input_type -> dataloader.GetTagSetsRequest
-	1,  // 37: dataloader.DataLoader.getTagSetById:input_type -> dataloader.IdRequest
-	11, // 38: dataloader.DataLoader.getTagSetByName:input_type -> dataloader.GetTagSetRequestByName
-	12, // 39: dataloader.DataLoader.createTagSet:input_type -> dataloader.CreateTagSetRequest
-	20, // 40: dataloader.DataLoader.getTags:input_type -> dataloader.GetTagsRequest
-	1,  // 41: dataloader.DataLoader.getTag:input_type -> dataloader.IdRequest
-	21, // 42: dataloader.DataLoader.createTag:input_type -> dataloader.CreateTagRequest
-	23, // 43: dataloader.DataLoader.createTagStream:input_type -> dataloader.CreateTagStreamRequest
-	0,  // 44: dataloader.DataLoader.getTaggings:input_type -> dataloader.Empty
-	1,  // 45: dataloader.DataLoader.getMediasWithTag:input_type -> dataloader.IdRequest
-	1,  // 46: dataloader.DataLoader.getMediaTags:input_type -> dataloader.IdRequest
-	26, // 47: dataloader.DataLoader.createTagging:input_type -> dataloader.CreateTaggingRequest
-	26, // 48: dataloader.DataLoader.createTaggingStream:input_type -> dataloader.CreateTaggingRequest
-	30, // 49: dataloader.DataLoader.getHierarchies:input_type -> dataloader.GetHierarchiesRequest
-	1,  // 50: dataloader.DataLoader.getHierarchy:input_type -> dataloader.IdRequest
-	31, // 51: dataloader.DataLoader.createHierarchy:input_type -> dataloader.CreateHierarchyRequest
-	35, // 52: dataloader.DataLoader.getNodes:input_type -> dataloader.GetNodesRequest
-	1,  // 53: dataloader.DataLoader.getNode:input_type -> dataloader.IdRequest
-	34, // 54: dataloader.DataLoader.createNode:input_type -> dataloader.CreateNodeRequest
-	34, // 55: dataloader.DataLoader.createNodeStream:input_type -> dataloader.CreateNodeRequest
-	1,  // 56: dataloader.DataLoader.deleteNode:input_type -> dataloader.IdRequest
-	0,  // 57: dataloader.DataLoader.resetDatabase:input_type -> dataloader.Empty
-	7,  // 58: dataloader.DataLoader.getMedias:output_type -> dataloader.StreamingMediaResponse
-	4,  // 59: dataloader.DataLoader.getMediaById:output_type -> dataloader.Media
-	4,  // 60: dataloader.DataLoader.getMediaByURI:output_type -> dataloader.Media
-	4,  // 61: dataloader.DataLoader.createMedia:output_type -> dataloader.Media
-	8,  // 62: dataloader.DataLoader.createMediaStream:output_type -> dataloader.CreateMediaStreamResponse
-	0,  // 63: dataloader.DataLoader.deleteMedia:output_type -> dataloader.Empty
-	13, // 64: dataloader.DataLoader.getTagSets:output_type -> dataloader.StreamingTagSetResponse
-	9,  // 65: dataloader.DataLoader.getTagSetById:output_type -> dataloader.TagSet
-	9,  // 66: dataloader.DataLoader.getTagSetByName:output_type -> dataloader.TagSet
-	9,  // 67: dataloader.DataLoader.createTagSet:output_type -> dataloader.TagSet
-	22, // 68: dataloader.DataLoader.getTags:output_type -> dataloader.StreamingTagResponse
-	14, // 69: dataloader.DataLoader.getTag:output_type -> dataloader.Tag
-	14, // 70: dataloader.DataLoader.createTag:output_type -> dataloader.Tag
-	24, // 71: dataloader.DataLoader.createTagStream:output_type -> dataloader.CreateTagStreamResponse
-	27, // 72: dataloader.DataLoader.getTaggings:output_type -> dataloader.StreamingTaggingResponse
-	3,  // 73: dataloader.DataLoader.getMediasWithTag:output_type -> dataloader.RepeatedIdResponse
-	3,  // 74: dataloader.DataLoader.getMediaTags:output_type -> dataloader.RepeatedIdResponse
-	25, // 75: dataloader.DataLoader.createTagging:output_type -> dataloader.Tagging
-	28, // 76: dataloader.DataLoader.createTaggingStream:output_type -> dataloader.CreateTaggingStreamResponse
-	32, // 77: dataloader.DataLoader.getHierarchies:output_type -> dataloader.StreamingHierarchyResponse
-	29, // 78: dataloader.DataLoader.getHierarchy:output_type -> dataloader.Hierarchy
-	29, // 79: dataloader.DataLoader.createHierarchy:output_type -> dataloader.Hierarchy
-	36, // 80: dataloader.DataLoader.getNodes:output_type -> dataloader.StreamingNodeResponse
-	33, // 81: dataloader.DataLoader.getNode:output_type -> dataloader.Node
-	33, // 82: dataloader.DataLoader.createNode:output_type -> dataloader.Node
-	36, // 83: dataloader.DataLoader.createNodeStream:output_type -> dataloader.StreamingNodeResponse
-	0,  // 84: dataloader.DataLoader.deleteNode:output_type -> dataloader.Empty
-	0,  // 85: dataloader.DataLoader.resetDatabase:output_type -> dataloader.Empty
-	58, // [58:86] is the sub-list for method output_type
-	30, // [30:58] is the sub-list for method input_type
-	30, // [30:30] is the sub-list for extension type_name
-	30, // [30:30] is the sub-list for extension extendee
-	0,  // [0:30] is the sub-list for field type_name
+	39, // 22: dataloader.CreateTagStreamResponse.id_map:type_name -> dataloader.CreateTagStreamResponse.IdMapEntry
+	15, // 23: dataloader.ChangeTagNameRequest.newAlphanumerical:type_name -> dataloader.AlphanumericalValue
+	19, // 24: dataloader.ChangeTagNameRequest.newTimestamp:type_name -> dataloader.TimeStampValue
+	18, // 25: dataloader.ChangeTagNameRequest.newTime:type_name -> dataloader.TimeValue
+	17, // 26: dataloader.ChangeTagNameRequest.newDate:type_name -> dataloader.DateValue
+	16, // 27: dataloader.ChangeTagNameRequest.newNumerical:type_name -> dataloader.NumericalValue
+	26, // 28: dataloader.StreamingTaggingResponse.tagging:type_name -> dataloader.Tagging
+	40, // 29: dataloader.StreamingTaggingResponse.error:type_name -> google.rpc.Status
+	40, // 30: dataloader.CreateTaggingStreamResponse.error:type_name -> google.rpc.Status
+	15, // 31: dataloader.ChangeTaggingRequest.alphanumerical:type_name -> dataloader.AlphanumericalValue
+	19, // 32: dataloader.ChangeTaggingRequest.timestamp:type_name -> dataloader.TimeStampValue
+	18, // 33: dataloader.ChangeTaggingRequest.time:type_name -> dataloader.TimeValue
+	17, // 34: dataloader.ChangeTaggingRequest.date:type_name -> dataloader.DateValue
+	16, // 35: dataloader.ChangeTaggingRequest.numerical:type_name -> dataloader.NumericalValue
+	31, // 36: dataloader.StreamingHierarchyResponse.hierarchy:type_name -> dataloader.Hierarchy
+	40, // 37: dataloader.StreamingHierarchyResponse.error:type_name -> google.rpc.Status
+	35, // 38: dataloader.StreamingNodeResponse.node:type_name -> dataloader.Node
+	40, // 39: dataloader.StreamingNodeResponse.error:type_name -> google.rpc.Status
+	5,  // 40: dataloader.DataLoader.getMedias:input_type -> dataloader.GetMediasRequest
+	1,  // 41: dataloader.DataLoader.getMediaById:input_type -> dataloader.IdRequest
+	6,  // 42: dataloader.DataLoader.getMediaByURI:input_type -> dataloader.GetMediaByURIRequest
+	4,  // 43: dataloader.DataLoader.createMedia:input_type -> dataloader.Media
+	4,  // 44: dataloader.DataLoader.createMediaStream:input_type -> dataloader.Media
+	1,  // 45: dataloader.DataLoader.deleteMedia:input_type -> dataloader.IdRequest
+	10, // 46: dataloader.DataLoader.getTagSets:input_type -> dataloader.GetTagSetsRequest
+	1,  // 47: dataloader.DataLoader.getTagSetById:input_type -> dataloader.IdRequest
+	11, // 48: dataloader.DataLoader.getTagSetByName:input_type -> dataloader.GetTagSetRequestByName
+	12, // 49: dataloader.DataLoader.createTagSet:input_type -> dataloader.CreateTagSetRequest
+	20, // 50: dataloader.DataLoader.getTags:input_type -> dataloader.GetTagsRequest
+	1,  // 51: dataloader.DataLoader.getTag:input_type -> dataloader.IdRequest
+	21, // 52: dataloader.DataLoader.createTag:input_type -> dataloader.CreateTagRequest
+	23, // 53: dataloader.DataLoader.createTagStream:input_type -> dataloader.CreateTagStreamRequest
+	25, // 54: dataloader.DataLoader.changeTagName:input_type -> dataloader.ChangeTagNameRequest
+	0,  // 55: dataloader.DataLoader.getTaggings:input_type -> dataloader.Empty
+	1,  // 56: dataloader.DataLoader.getMediasWithTag:input_type -> dataloader.IdRequest
+	1,  // 57: dataloader.DataLoader.getMediaTags:input_type -> dataloader.IdRequest
+	27, // 58: dataloader.DataLoader.createTagging:input_type -> dataloader.CreateTaggingRequest
+	27, // 59: dataloader.DataLoader.createTaggingStream:input_type -> dataloader.CreateTaggingRequest
+	30, // 60: dataloader.DataLoader.changeTagging:input_type -> dataloader.ChangeTaggingRequest
+	32, // 61: dataloader.DataLoader.getHierarchies:input_type -> dataloader.GetHierarchiesRequest
+	1,  // 62: dataloader.DataLoader.getHierarchy:input_type -> dataloader.IdRequest
+	33, // 63: dataloader.DataLoader.createHierarchy:input_type -> dataloader.CreateHierarchyRequest
+	37, // 64: dataloader.DataLoader.getNodes:input_type -> dataloader.GetNodesRequest
+	1,  // 65: dataloader.DataLoader.getNode:input_type -> dataloader.IdRequest
+	36, // 66: dataloader.DataLoader.createNode:input_type -> dataloader.CreateNodeRequest
+	36, // 67: dataloader.DataLoader.createNodeStream:input_type -> dataloader.CreateNodeRequest
+	1,  // 68: dataloader.DataLoader.deleteNode:input_type -> dataloader.IdRequest
+	0,  // 69: dataloader.DataLoader.resetDatabase:input_type -> dataloader.Empty
+	7,  // 70: dataloader.DataLoader.getMedias:output_type -> dataloader.StreamingMediaResponse
+	4,  // 71: dataloader.DataLoader.getMediaById:output_type -> dataloader.Media
+	4,  // 72: dataloader.DataLoader.getMediaByURI:output_type -> dataloader.Media
+	4,  // 73: dataloader.DataLoader.createMedia:output_type -> dataloader.Media
+	8,  // 74: dataloader.DataLoader.createMediaStream:output_type -> dataloader.CreateMediaStreamResponse
+	0,  // 75: dataloader.DataLoader.deleteMedia:output_type -> dataloader.Empty
+	13, // 76: dataloader.DataLoader.getTagSets:output_type -> dataloader.StreamingTagSetResponse
+	9,  // 77: dataloader.DataLoader.getTagSetById:output_type -> dataloader.TagSet
+	9,  // 78: dataloader.DataLoader.getTagSetByName:output_type -> dataloader.TagSet
+	9,  // 79: dataloader.DataLoader.createTagSet:output_type -> dataloader.TagSet
+	22, // 80: dataloader.DataLoader.getTags:output_type -> dataloader.StreamingTagResponse
+	14, // 81: dataloader.DataLoader.getTag:output_type -> dataloader.Tag
+	14, // 82: dataloader.DataLoader.createTag:output_type -> dataloader.Tag
+	24, // 83: dataloader.DataLoader.createTagStream:output_type -> dataloader.CreateTagStreamResponse
+	0,  // 84: dataloader.DataLoader.changeTagName:output_type -> dataloader.Empty
+	28, // 85: dataloader.DataLoader.getTaggings:output_type -> dataloader.StreamingTaggingResponse
+	3,  // 86: dataloader.DataLoader.getMediasWithTag:output_type -> dataloader.RepeatedIdResponse
+	3,  // 87: dataloader.DataLoader.getMediaTags:output_type -> dataloader.RepeatedIdResponse
+	26, // 88: dataloader.DataLoader.createTagging:output_type -> dataloader.Tagging
+	29, // 89: dataloader.DataLoader.createTaggingStream:output_type -> dataloader.CreateTaggingStreamResponse
+	0,  // 90: dataloader.DataLoader.changeTagging:output_type -> dataloader.Empty
+	34, // 91: dataloader.DataLoader.getHierarchies:output_type -> dataloader.StreamingHierarchyResponse
+	31, // 92: dataloader.DataLoader.getHierarchy:output_type -> dataloader.Hierarchy
+	31, // 93: dataloader.DataLoader.createHierarchy:output_type -> dataloader.Hierarchy
+	38, // 94: dataloader.DataLoader.getNodes:output_type -> dataloader.StreamingNodeResponse
+	35, // 95: dataloader.DataLoader.getNode:output_type -> dataloader.Node
+	35, // 96: dataloader.DataLoader.createNode:output_type -> dataloader.Node
+	38, // 97: dataloader.DataLoader.createNodeStream:output_type -> dataloader.StreamingNodeResponse
+	0,  // 98: dataloader.DataLoader.deleteNode:output_type -> dataloader.Empty
+	0,  // 99: dataloader.DataLoader.resetDatabase:output_type -> dataloader.Empty
+	70, // [70:100] is the sub-list for method output_type
+	40, // [40:70] is the sub-list for method input_type
+	40, // [40:40] is the sub-list for extension type_name
+	40, // [40:40] is the sub-list for extension extendee
+	0,  // [0:40] is the sub-list for field type_name
 }
 
 func init() { file_dataloader_proto_init() }
@@ -2813,19 +3168,33 @@ func file_dataloader_proto_init() {
 		(*CreateTagStreamRequest_Date)(nil),
 		(*CreateTagStreamRequest_Numerical)(nil),
 	}
-	file_dataloader_proto_msgTypes[27].OneofWrappers = []any{
+	file_dataloader_proto_msgTypes[25].OneofWrappers = []any{
+		(*ChangeTagNameRequest_NewAlphanumerical)(nil),
+		(*ChangeTagNameRequest_NewTimestamp)(nil),
+		(*ChangeTagNameRequest_NewTime)(nil),
+		(*ChangeTagNameRequest_NewDate)(nil),
+		(*ChangeTagNameRequest_NewNumerical)(nil),
+	}
+	file_dataloader_proto_msgTypes[28].OneofWrappers = []any{
 		(*StreamingTaggingResponse_Tagging)(nil),
 		(*StreamingTaggingResponse_Error)(nil),
 	}
-	file_dataloader_proto_msgTypes[28].OneofWrappers = []any{
+	file_dataloader_proto_msgTypes[29].OneofWrappers = []any{
 		(*CreateTaggingStreamResponse_Count)(nil),
 		(*CreateTaggingStreamResponse_Error)(nil),
 	}
-	file_dataloader_proto_msgTypes[32].OneofWrappers = []any{
+	file_dataloader_proto_msgTypes[30].OneofWrappers = []any{
+		(*ChangeTaggingRequest_Alphanumerical)(nil),
+		(*ChangeTaggingRequest_Timestamp)(nil),
+		(*ChangeTaggingRequest_Time)(nil),
+		(*ChangeTaggingRequest_Date)(nil),
+		(*ChangeTaggingRequest_Numerical)(nil),
+	}
+	file_dataloader_proto_msgTypes[34].OneofWrappers = []any{
 		(*StreamingHierarchyResponse_Hierarchy)(nil),
 		(*StreamingHierarchyResponse_Error)(nil),
 	}
-	file_dataloader_proto_msgTypes[36].OneofWrappers = []any{
+	file_dataloader_proto_msgTypes[38].OneofWrappers = []any{
 		(*StreamingNodeResponse_Node)(nil),
 		(*StreamingNodeResponse_Error)(nil),
 	}
@@ -2835,7 +3204,7 @@ func file_dataloader_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dataloader_proto_rawDesc), len(file_dataloader_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   38,
+			NumMessages:   40,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

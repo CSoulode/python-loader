@@ -28,6 +28,7 @@ service DataLoader {
   rpc createTagStream(stream CreateTagStreamRequest) returns (stream CreateTagStreamResponse) {};
     // Create multiple tags using batches of INSERT queries
     // Returns a map of the given IDs to the created IDs (used for JSON imports)
+  rpc changeTagName(ChangeTagNameRequest) returns (Empty) {}; // Change the name of a tag given its ID and new name
 
 	// -------------------------- Taggings
 	rpc getTaggings(Empty) returns (stream StreamingTaggingResponse) {};    // Get all the taggings stored in DB
@@ -37,6 +38,7 @@ service DataLoader {
   rpc createTaggingStream(stream CreateTaggingRequest) returns (stream CreateTaggingStreamResponse) {};
     // Create multiple taggings using batches of INSERT queries
     // Returns the amount added at each batch addition (similiar behaviour as in createMediaStream)
+  rpc changeTagging(ChangeTaggingRequest) returns (Empty) {}; // Change a tagging for a given media and tag
 
   // -------------------------- Hierarchies
 	rpc getHierarchies(GetHierarchiesRequest) returns (stream StreamingHierarchyResponse) {};  // Get all the hierarchies stored in DB, with optional tagset filter
@@ -209,6 +211,19 @@ message CreateTagStreamResponse {
   string error_message = 2;
 }
 
+message ChangeTagNameRequest {
+  int64 tagId = 1;
+  int64 tagTypeId = 2;
+  int64 tagSetId = 3;
+  oneof newName {
+    AlphanumericalValue newAlphanumerical = 4;
+    TimeStampValue newTimestamp = 5;
+    TimeValue newTime = 6;
+    DateValue newDate = 7;
+    NumericalValue newNumerical = 8;
+  }
+}
+
 // Tagging (mapped in table taggings)
 
 message Tagging {
@@ -232,6 +247,20 @@ message CreateTaggingStreamResponse {
   oneof message {
     int64 count = 1; // Number of taggings added in the batch
     google.rpc.Status error = 2; // Error message if any
+  }
+}
+
+message ChangeTaggingRequest {
+  int64 mediaId = 1;
+  int64 tagSetId = 2;
+  int64 tagId = 3;
+  int64 tagTypeId = 4;
+  oneof newName {
+    AlphanumericalValue alphanumerical = 5;
+    TimeStampValue timestamp = 6;
+    TimeValue time = 7;
+    DateValue date = 8;
+    NumericalValue numerical = 9;
   }
 }
 

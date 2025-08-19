@@ -262,29 +262,3 @@ CREATE TRIGGER check_tagtype_matching
 BEFORE INSERT OR UPDATE ON public.tags
 FOR EACH ROW
 EXECUTE FUNCTION public.check_matching_tagtype();
-
--- Check that the tag belongs the the tagset of the hierachy
-CREATE OR REPLACE FUNCTION public.check_nodes_tagset()
-RETURNS TRIGGER AS
-$$
-DECLARE
-  tagset_id_for_hierarchy INTEGER;
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM public.tags t 
-    JOIN (SELECT tagset_id FROM public.hierarchies WHERE id = NEW.hierarchy_id) h
-    ON t.tagset_id = h.tagset_id
-    WHERE t.id = NEW.tag_id
-  ) THEN
-    RAISE EXCEPTION 'The tag_id does not belong to the correct tagset_id for this hierarchy.';
-  END IF;
-  RETURN NEW;
-END;
-$$
-LANGUAGE plpgsql;
-
-CREATE TRIGGER trigger_check_nodes_tagset
-BEFORE INSERT OR UPDATE ON public.nodes
-FOR EACH ROW
-EXECUTE FUNCTION public.check_nodes_tagset();

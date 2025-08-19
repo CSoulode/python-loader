@@ -226,6 +226,26 @@ class CreateTagStreamResponse(_message.Message):
     error_message: str
     def __init__(self, id_map: _Optional[_Mapping[int, int]] = ..., error_message: _Optional[str] = ...) -> None: ...
 
+class ChangeTagNameRequest(_message.Message):
+    __slots__ = ("tagId", "tagTypeId", "tagSetId", "newAlphanumerical", "newTimestamp", "newTime", "newDate", "newNumerical")
+    TAGID_FIELD_NUMBER: _ClassVar[int]
+    TAGTYPEID_FIELD_NUMBER: _ClassVar[int]
+    TAGSETID_FIELD_NUMBER: _ClassVar[int]
+    NEWALPHANUMERICAL_FIELD_NUMBER: _ClassVar[int]
+    NEWTIMESTAMP_FIELD_NUMBER: _ClassVar[int]
+    NEWTIME_FIELD_NUMBER: _ClassVar[int]
+    NEWDATE_FIELD_NUMBER: _ClassVar[int]
+    NEWNUMERICAL_FIELD_NUMBER: _ClassVar[int]
+    tagId: int
+    tagTypeId: int
+    tagSetId: int
+    newAlphanumerical: AlphanumericalValue
+    newTimestamp: TimeStampValue
+    newTime: TimeValue
+    newDate: DateValue
+    newNumerical: NumericalValue
+    def __init__(self, tagId: _Optional[int] = ..., tagTypeId: _Optional[int] = ..., tagSetId: _Optional[int] = ..., newAlphanumerical: _Optional[_Union[AlphanumericalValue, _Mapping]] = ..., newTimestamp: _Optional[_Union[TimeStampValue, _Mapping]] = ..., newTime: _Optional[_Union[TimeValue, _Mapping]] = ..., newDate: _Optional[_Union[DateValue, _Mapping]] = ..., newNumerical: _Optional[_Union[NumericalValue, _Mapping]] = ...) -> None: ...
+
 class Tagging(_message.Message):
     __slots__ = ("mediaId", "tagId")
     MEDIAID_FIELD_NUMBER: _ClassVar[int]
@@ -257,6 +277,28 @@ class CreateTaggingStreamResponse(_message.Message):
     count: int
     error: _status_pb2.Status
     def __init__(self, count: _Optional[int] = ..., error: _Optional[_Union[_status_pb2.Status, _Mapping]] = ...) -> None: ...
+
+class ChangeTaggingRequest(_message.Message):
+    __slots__ = ("mediaId", "tagSetId", "tagId", "tagTypeId", "alphanumerical", "timestamp", "time", "date", "numerical")
+    MEDIAID_FIELD_NUMBER: _ClassVar[int]
+    TAGSETID_FIELD_NUMBER: _ClassVar[int]
+    TAGID_FIELD_NUMBER: _ClassVar[int]
+    TAGTYPEID_FIELD_NUMBER: _ClassVar[int]
+    ALPHANUMERICAL_FIELD_NUMBER: _ClassVar[int]
+    TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
+    TIME_FIELD_NUMBER: _ClassVar[int]
+    DATE_FIELD_NUMBER: _ClassVar[int]
+    NUMERICAL_FIELD_NUMBER: _ClassVar[int]
+    mediaId: int
+    tagSetId: int
+    tagId: int
+    tagTypeId: int
+    alphanumerical: AlphanumericalValue
+    timestamp: TimeStampValue
+    time: TimeValue
+    date: DateValue
+    numerical: NumericalValue
+    def __init__(self, mediaId: _Optional[int] = ..., tagSetId: _Optional[int] = ..., tagId: _Optional[int] = ..., tagTypeId: _Optional[int] = ..., alphanumerical: _Optional[_Union[AlphanumericalValue, _Mapping]] = ..., timestamp: _Optional[_Union[TimeStampValue, _Mapping]] = ..., time: _Optional[_Union[TimeValue, _Mapping]] = ..., date: _Optional[_Union[DateValue, _Mapping]] = ..., numerical: _Optional[_Union[NumericalValue, _Mapping]] = ...) -> None: ...
 
 class Hierarchy(_message.Message):
     __slots__ = ("id", "name", "tagSetId", "rootNodeId")

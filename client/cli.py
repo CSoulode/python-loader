@@ -18,9 +18,7 @@ from filemgmt.json_hr import JSONHandler
 from filemgmt.csv import CSVHandler
 from filemgmt.json_fast import FastJSONHandler
 
-client = LoaderClient(grpc_host='localhost', grpc_port='50051')
-
-SERVER_ADDRESS = "localhost:50051"
+client = LoaderClient()
 
 @click.group()
 def cli():
@@ -413,6 +411,73 @@ def node(node_id):
     else:
         click.echo("Input error: index must be > 0")
 
+
+#!================ Change functions ======================================================================
+
+@cli.group()
+def change():
+    """Change elements in the database"""
+    pass
+
+@change.command()
+@click.argument("tag_id", type=int)
+@click.argument("tag_type_id", type=int)
+@click.argument("tag_set_id", type=int)
+@click.argument("new_value", type=str)
+def tag_name(tag_id, tag_type_id, tag_set_id, new_value):
+    """Change the name of a tag with given ID, type and tagset. The new value must be provided."""
+    if tag_id <= 0:
+        click.echo("Error: tag_id must be > 0")
+        return
+    if tag_type_id not in range(1, 6):
+        click.echo("Error: tag_type_id must be between 1 and 5")
+        return
+    if tag_set_id <= 0:
+        click.echo("Error: tag_set_id must be > 0")
+        return
+    if not new_value:
+        click.echo("Error: new_value cannot be empty")
+        return
+
+    try:
+        response = client.change_tag_name(tag_id, tag_type_id, tag_set_id, new_value)
+    except Exception as e:
+        click.echo("Error occurred: %s" % e)
+        return
+
+    click.echo("Tag name changed successfully")
+    
+@change.command()
+@click.argument("media_id", type=int)
+@click.argument("tag_set_id", type=int)
+@click.argument("tag_id", type=int)
+@click.argument("tag_type_id", type=int)
+@click.argument("new_value", type=str)
+def tagging(media_id, tag_set_id, tag_id, tag_type_id, new_value):
+    """Change the tagging of a media with given ID, tagset ID, tag ID and type. The new value must be provided."""
+    if media_id <= 0:
+        click.echo("Error: media_id must be > 0")
+        return
+    if tag_set_id <= 0:
+        click.echo("Error: tag_set_id must be > 0")
+        return
+    if tag_id <= 0:
+        click.echo("Error: tag_id must be > 0")
+        return
+    if tag_type_id not in range(1, 6):
+        click.echo("Error: tag_type_id must be between 1 and 5")
+        return
+    if not new_value:
+        click.echo("Error: new_value cannot be empty")
+        return
+
+    try:
+        response = client.change_tagging(media_id, tag_set_id, tag_id, tag_type_id, new_value)
+    except Exception as e:
+        click.echo("Error occurred: %s" % e)
+        return
+
+    click.echo("Tagging changed successfully")
 
 
 #!================ General functions ======================================================================

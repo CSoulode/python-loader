@@ -104,6 +104,11 @@ class DataLoaderStub(object):
                 request_serializer=dataloader__pb2.CreateTagStreamRequest.SerializeToString,
                 response_deserializer=dataloader__pb2.CreateTagStreamResponse.FromString,
                 _registered_method=True)
+        self.changeTagName = channel.unary_unary(
+                '/dataloader.DataLoader/changeTagName',
+                request_serializer=dataloader__pb2.ChangeTagNameRequest.SerializeToString,
+                response_deserializer=dataloader__pb2.Empty.FromString,
+                _registered_method=True)
         self.getTaggings = channel.unary_stream(
                 '/dataloader.DataLoader/getTaggings',
                 request_serializer=dataloader__pb2.Empty.SerializeToString,
@@ -128,6 +133,11 @@ class DataLoaderStub(object):
                 '/dataloader.DataLoader/createTaggingStream',
                 request_serializer=dataloader__pb2.CreateTaggingRequest.SerializeToString,
                 response_deserializer=dataloader__pb2.CreateTaggingStreamResponse.FromString,
+                _registered_method=True)
+        self.changeTagging = channel.unary_unary(
+                '/dataloader.DataLoader/changeTagging',
+                request_serializer=dataloader__pb2.ChangeTaggingRequest.SerializeToString,
+                response_deserializer=dataloader__pb2.Empty.FromString,
                 _registered_method=True)
         self.getHierarchies = channel.unary_stream(
                 '/dataloader.DataLoader/getHierarchies',
@@ -267,6 +277,14 @@ class DataLoaderServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def changeTagName(self, request, context):
+        """Create multiple tags using batches of INSERT queries
+        Returns a map of the given IDs to the created IDs (used for JSON imports)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def getTaggings(self, request, context):
         """-------------------------- Taggings
         """
@@ -294,6 +312,14 @@ class DataLoaderServicer(object):
 
     def createTaggingStream(self, request_iterator, context):
         """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def changeTagging(self, request, context):
+        """Create multiple taggings using batches of INSERT queries
+        Returns the amount added at each batch addition (similiar behaviour as in createMediaStream)
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -430,6 +456,11 @@ def add_DataLoaderServicer_to_server(servicer, server):
                     request_deserializer=dataloader__pb2.CreateTagStreamRequest.FromString,
                     response_serializer=dataloader__pb2.CreateTagStreamResponse.SerializeToString,
             ),
+            'changeTagName': grpc.unary_unary_rpc_method_handler(
+                    servicer.changeTagName,
+                    request_deserializer=dataloader__pb2.ChangeTagNameRequest.FromString,
+                    response_serializer=dataloader__pb2.Empty.SerializeToString,
+            ),
             'getTaggings': grpc.unary_stream_rpc_method_handler(
                     servicer.getTaggings,
                     request_deserializer=dataloader__pb2.Empty.FromString,
@@ -454,6 +485,11 @@ def add_DataLoaderServicer_to_server(servicer, server):
                     servicer.createTaggingStream,
                     request_deserializer=dataloader__pb2.CreateTaggingRequest.FromString,
                     response_serializer=dataloader__pb2.CreateTaggingStreamResponse.SerializeToString,
+            ),
+            'changeTagging': grpc.unary_unary_rpc_method_handler(
+                    servicer.changeTagging,
+                    request_deserializer=dataloader__pb2.ChangeTaggingRequest.FromString,
+                    response_serializer=dataloader__pb2.Empty.SerializeToString,
             ),
             'getHierarchies': grpc.unary_stream_rpc_method_handler(
                     servicer.getHierarchies,
@@ -890,6 +926,33 @@ class DataLoader(object):
             _registered_method=True)
 
     @staticmethod
+    def changeTagName(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/dataloader.DataLoader/changeTagName',
+            dataloader__pb2.ChangeTagNameRequest.SerializeToString,
+            dataloader__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def getTaggings(request,
             target,
             options=(),
@@ -1014,6 +1077,33 @@ class DataLoader(object):
             '/dataloader.DataLoader/createTaggingStream',
             dataloader__pb2.CreateTaggingRequest.SerializeToString,
             dataloader__pb2.CreateTaggingStreamResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def changeTagging(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/dataloader.DataLoader/changeTagging',
+            dataloader__pb2.ChangeTaggingRequest.SerializeToString,
+            dataloader__pb2.Empty.FromString,
             options,
             channel_credentials,
             insecure,

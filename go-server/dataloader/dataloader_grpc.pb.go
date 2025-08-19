@@ -33,11 +33,13 @@ const (
 	DataLoader_GetTag_FullMethodName              = "/dataloader.DataLoader/getTag"
 	DataLoader_CreateTag_FullMethodName           = "/dataloader.DataLoader/createTag"
 	DataLoader_CreateTagStream_FullMethodName     = "/dataloader.DataLoader/createTagStream"
+	DataLoader_ChangeTagName_FullMethodName       = "/dataloader.DataLoader/changeTagName"
 	DataLoader_GetTaggings_FullMethodName         = "/dataloader.DataLoader/getTaggings"
 	DataLoader_GetMediasWithTag_FullMethodName    = "/dataloader.DataLoader/getMediasWithTag"
 	DataLoader_GetMediaTags_FullMethodName        = "/dataloader.DataLoader/getMediaTags"
 	DataLoader_CreateTagging_FullMethodName       = "/dataloader.DataLoader/createTagging"
 	DataLoader_CreateTaggingStream_FullMethodName = "/dataloader.DataLoader/createTaggingStream"
+	DataLoader_ChangeTagging_FullMethodName       = "/dataloader.DataLoader/changeTagging"
 	DataLoader_GetHierarchies_FullMethodName      = "/dataloader.DataLoader/getHierarchies"
 	DataLoader_GetHierarchy_FullMethodName        = "/dataloader.DataLoader/getHierarchy"
 	DataLoader_CreateHierarchy_FullMethodName     = "/dataloader.DataLoader/createHierarchy"
@@ -71,12 +73,18 @@ type DataLoaderClient interface {
 	GetTag(ctx context.Context, in *IdRequest, opts ...grpc.CallOption) (*Tag, error)
 	CreateTag(ctx context.Context, in *CreateTagRequest, opts ...grpc.CallOption) (*Tag, error)
 	CreateTagStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[CreateTagStreamRequest, CreateTagStreamResponse], error)
+	// Create multiple tags using batches of INSERT queries
+	// Returns a map of the given IDs to the created IDs (used for JSON imports)
+	ChangeTagName(ctx context.Context, in *ChangeTagNameRequest, opts ...grpc.CallOption) (*Empty, error)
 	// -------------------------- Taggings
 	GetTaggings(ctx context.Context, in *Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamingTaggingResponse], error)
 	GetMediasWithTag(ctx context.Context, in *IdRequest, opts ...grpc.CallOption) (*RepeatedIdResponse, error)
 	GetMediaTags(ctx context.Context, in *IdRequest, opts ...grpc.CallOption) (*RepeatedIdResponse, error)
 	CreateTagging(ctx context.Context, in *CreateTaggingRequest, opts ...grpc.CallOption) (*Tagging, error)
 	CreateTaggingStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[CreateTaggingRequest, CreateTaggingStreamResponse], error)
+	// Create multiple taggings using batches of INSERT queries
+	// Returns the amount added at each batch addition (similiar behaviour as in createMediaStream)
+	ChangeTagging(ctx context.Context, in *ChangeTaggingRequest, opts ...grpc.CallOption) (*Empty, error)
 	// -------------------------- Hierarchies
 	GetHierarchies(ctx context.Context, in *GetHierarchiesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamingHierarchyResponse], error)
 	GetHierarchy(ctx context.Context, in *IdRequest, opts ...grpc.CallOption) (*Hierarchy, error)
@@ -272,6 +280,16 @@ func (c *dataLoaderClient) CreateTagStream(ctx context.Context, opts ...grpc.Cal
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type DataLoader_CreateTagStreamClient = grpc.BidiStreamingClient[CreateTagStreamRequest, CreateTagStreamResponse]
 
+func (c *dataLoaderClient) ChangeTagName(ctx context.Context, in *ChangeTagNameRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, DataLoader_ChangeTagName_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *dataLoaderClient) GetTaggings(ctx context.Context, in *Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamingTaggingResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[5], DataLoader_GetTaggings_FullMethodName, cOpts...)
@@ -333,6 +351,16 @@ func (c *dataLoaderClient) CreateTaggingStream(ctx context.Context, opts ...grpc
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type DataLoader_CreateTaggingStreamClient = grpc.BidiStreamingClient[CreateTaggingRequest, CreateTaggingStreamResponse]
+
+func (c *dataLoaderClient) ChangeTagging(ctx context.Context, in *ChangeTaggingRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, DataLoader_ChangeTagging_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 func (c *dataLoaderClient) GetHierarchies(ctx context.Context, in *GetHierarchiesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamingHierarchyResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -467,12 +495,18 @@ type DataLoaderServer interface {
 	GetTag(context.Context, *IdRequest) (*Tag, error)
 	CreateTag(context.Context, *CreateTagRequest) (*Tag, error)
 	CreateTagStream(grpc.BidiStreamingServer[CreateTagStreamRequest, CreateTagStreamResponse]) error
+	// Create multiple tags using batches of INSERT queries
+	// Returns a map of the given IDs to the created IDs (used for JSON imports)
+	ChangeTagName(context.Context, *ChangeTagNameRequest) (*Empty, error)
 	// -------------------------- Taggings
 	GetTaggings(*Empty, grpc.ServerStreamingServer[StreamingTaggingResponse]) error
 	GetMediasWithTag(context.Context, *IdRequest) (*RepeatedIdResponse, error)
 	GetMediaTags(context.Context, *IdRequest) (*RepeatedIdResponse, error)
 	CreateTagging(context.Context, *CreateTaggingRequest) (*Tagging, error)
 	CreateTaggingStream(grpc.BidiStreamingServer[CreateTaggingRequest, CreateTaggingStreamResponse]) error
+	// Create multiple taggings using batches of INSERT queries
+	// Returns the amount added at each batch addition (similiar behaviour as in createMediaStream)
+	ChangeTagging(context.Context, *ChangeTaggingRequest) (*Empty, error)
 	// -------------------------- Hierarchies
 	GetHierarchies(*GetHierarchiesRequest, grpc.ServerStreamingServer[StreamingHierarchyResponse]) error
 	GetHierarchy(context.Context, *IdRequest) (*Hierarchy, error)
@@ -537,6 +571,9 @@ func (UnimplementedDataLoaderServer) CreateTag(context.Context, *CreateTagReques
 func (UnimplementedDataLoaderServer) CreateTagStream(grpc.BidiStreamingServer[CreateTagStreamRequest, CreateTagStreamResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method CreateTagStream not implemented")
 }
+func (UnimplementedDataLoaderServer) ChangeTagName(context.Context, *ChangeTagNameRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ChangeTagName not implemented")
+}
 func (UnimplementedDataLoaderServer) GetTaggings(*Empty, grpc.ServerStreamingServer[StreamingTaggingResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method GetTaggings not implemented")
 }
@@ -551,6 +588,9 @@ func (UnimplementedDataLoaderServer) CreateTagging(context.Context, *CreateTaggi
 }
 func (UnimplementedDataLoaderServer) CreateTaggingStream(grpc.BidiStreamingServer[CreateTaggingRequest, CreateTaggingStreamResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method CreateTaggingStream not implemented")
+}
+func (UnimplementedDataLoaderServer) ChangeTagging(context.Context, *ChangeTaggingRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ChangeTagging not implemented")
 }
 func (UnimplementedDataLoaderServer) GetHierarchies(*GetHierarchiesRequest, grpc.ServerStreamingServer[StreamingHierarchyResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method GetHierarchies not implemented")
@@ -809,6 +849,24 @@ func _DataLoader_CreateTagStream_Handler(srv interface{}, stream grpc.ServerStre
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type DataLoader_CreateTagStreamServer = grpc.BidiStreamingServer[CreateTagStreamRequest, CreateTagStreamResponse]
 
+func _DataLoader_ChangeTagName_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChangeTagNameRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataLoaderServer).ChangeTagName(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DataLoader_ChangeTagName_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataLoaderServer).ChangeTagName(ctx, req.(*ChangeTagNameRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _DataLoader_GetTaggings_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(Empty)
 	if err := stream.RecvMsg(m); err != nil {
@@ -880,6 +938,24 @@ func _DataLoader_CreateTaggingStream_Handler(srv interface{}, stream grpc.Server
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type DataLoader_CreateTaggingStreamServer = grpc.BidiStreamingServer[CreateTaggingRequest, CreateTaggingStreamResponse]
+
+func _DataLoader_ChangeTagging_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChangeTaggingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataLoaderServer).ChangeTagging(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DataLoader_ChangeTagging_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataLoaderServer).ChangeTagging(ctx, req.(*ChangeTaggingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
 
 func _DataLoader_GetHierarchies_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(GetHierarchiesRequest)
@@ -1062,6 +1138,10 @@ var DataLoader_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _DataLoader_CreateTag_Handler,
 		},
 		{
+			MethodName: "changeTagName",
+			Handler:    _DataLoader_ChangeTagName_Handler,
+		},
+		{
 			MethodName: "getMediasWithTag",
 			Handler:    _DataLoader_GetMediasWithTag_Handler,
 		},
@@ -1072,6 +1152,10 @@ var DataLoader_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "createTagging",
 			Handler:    _DataLoader_CreateTagging_Handler,
+		},
+		{
+			MethodName: "changeTagging",
+			Handler:    _DataLoader_ChangeTagging_Handler,
 		},
 		{
 			MethodName: "getHierarchy",
