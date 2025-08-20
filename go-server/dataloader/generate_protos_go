@@ -1,3 +1,7 @@
-protoc --go_out=. --go_opt=paths=source_relative \
-    --go-grpc_out=. --go-grpc_opt=paths=source_relative \
-	-I../protos dataloader.proto
+protoc \
+  -I ../protos \
+  -I /usr/local/include/googleapis \
+  --go_out=dataloader --go_opt=paths=source_relative \
+  --go-grpc_out=dataloader --go-grpc_opt=paths=source_relative \
+  --grpc-gateway_out=dataloader --grpc-gateway_opt=paths=source_relative \
+dataloader.proto
