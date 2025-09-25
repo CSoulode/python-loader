@@ -45,9 +45,11 @@ const (
 	DataLoader_CreateHierarchy_FullMethodName     = "/dataloader.DataLoader/createHierarchy"
 	DataLoader_GetNodes_FullMethodName            = "/dataloader.DataLoader/getNodes"
 	DataLoader_GetNode_FullMethodName             = "/dataloader.DataLoader/getNode"
+	DataLoader_GetChildNodes_FullMethodName       = "/dataloader.DataLoader/getChildNodes"
 	DataLoader_CreateNode_FullMethodName          = "/dataloader.DataLoader/createNode"
 	DataLoader_CreateNodeStream_FullMethodName    = "/dataloader.DataLoader/createNodeStream"
 	DataLoader_DeleteNode_FullMethodName          = "/dataloader.DataLoader/deleteNode"
+	DataLoader_GetCell_FullMethodName             = "/dataloader.DataLoader/getCell"
 	DataLoader_ResetDatabase_FullMethodName       = "/dataloader.DataLoader/resetDatabase"
 )
 
@@ -65,7 +67,9 @@ type DataLoaderClient interface {
 	DeleteMedia(ctx context.Context, in *IdRequest, opts ...grpc.CallOption) (*Empty, error)
 	// -------------------------- TagSets
 	GetTagSets(ctx context.Context, in *GetTagSetsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamingTagSetResponse], error)
+	// Get all the tagsets stored in DB, with optional tagtype filter
 	GetTagSetById(ctx context.Context, in *IdRequest, opts ...grpc.CallOption) (*TagSet, error)
+	// Get a single tagset with the given ID
 	GetTagSetByName(ctx context.Context, in *GetTagSetRequestByName, opts ...grpc.CallOption) (*TagSet, error)
 	CreateTagSet(ctx context.Context, in *CreateTagSetRequest, opts ...grpc.CallOption) (*TagSet, error)
 	// -------------------------- Tags
@@ -92,9 +96,12 @@ type DataLoaderClient interface {
 	// -------------------------- Nodes
 	GetNodes(ctx context.Context, in *GetNodesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamingNodeResponse], error)
 	GetNode(ctx context.Context, in *IdRequest, opts ...grpc.CallOption) (*Node, error)
+	GetChildNodes(ctx context.Context, in *IdRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ChildNodeResponse], error)
 	CreateNode(ctx context.Context, in *CreateNodeRequest, opts ...grpc.CallOption) (*Node, error)
 	CreateNodeStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[CreateNodeRequest, StreamingNodeResponse], error)
 	DeleteNode(ctx context.Context, in *IdRequest, opts ...grpc.CallOption) (*Empty, error)
+	// -------------------------- Cell
+	GetCell(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellResponse], error)
 	// Other
 	ResetDatabase(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 }
@@ -430,6 +437,25 @@ func (c *dataLoaderClient) GetNode(ctx context.Context, in *IdRequest, opts ...g
 	return out, nil
 }
 
+func (c *dataLoaderClient) GetChildNodes(ctx context.Context, in *IdRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ChildNodeResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[9], DataLoader_GetChildNodes_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[IdRequest, ChildNodeResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetChildNodesClient = grpc.ServerStreamingClient[ChildNodeResponse]
+
 func (c *dataLoaderClient) CreateNode(ctx context.Context, in *CreateNodeRequest, opts ...grpc.CallOption) (*Node, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Node)
@@ -442,7 +468,7 @@ func (c *dataLoaderClient) CreateNode(ctx context.Context, in *CreateNodeRequest
 
 func (c *dataLoaderClient) CreateNodeStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[CreateNodeRequest, StreamingNodeResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[9], DataLoader_CreateNodeStream_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[10], DataLoader_CreateNodeStream_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -462,6 +488,25 @@ func (c *dataLoaderClient) DeleteNode(ctx context.Context, in *IdRequest, opts .
 	}
 	return out, nil
 }
+
+func (c *dataLoaderClient) GetCell(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[11], DataLoader_GetCell_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[GetCellRequest, CellResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetCellClient = grpc.ServerStreamingClient[CellResponse]
 
 func (c *dataLoaderClient) ResetDatabase(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -487,7 +532,9 @@ type DataLoaderServer interface {
 	DeleteMedia(context.Context, *IdRequest) (*Empty, error)
 	// -------------------------- TagSets
 	GetTagSets(*GetTagSetsRequest, grpc.ServerStreamingServer[StreamingTagSetResponse]) error
+	// Get all the tagsets stored in DB, with optional tagtype filter
 	GetTagSetById(context.Context, *IdRequest) (*TagSet, error)
+	// Get a single tagset with the given ID
 	GetTagSetByName(context.Context, *GetTagSetRequestByName) (*TagSet, error)
 	CreateTagSet(context.Context, *CreateTagSetRequest) (*TagSet, error)
 	// -------------------------- Tags
@@ -514,9 +561,12 @@ type DataLoaderServer interface {
 	// -------------------------- Nodes
 	GetNodes(*GetNodesRequest, grpc.ServerStreamingServer[StreamingNodeResponse]) error
 	GetNode(context.Context, *IdRequest) (*Node, error)
+	GetChildNodes(*IdRequest, grpc.ServerStreamingServer[ChildNodeResponse]) error
 	CreateNode(context.Context, *CreateNodeRequest) (*Node, error)
 	CreateNodeStream(grpc.BidiStreamingServer[CreateNodeRequest, StreamingNodeResponse]) error
 	DeleteNode(context.Context, *IdRequest) (*Empty, error)
+	// -------------------------- Cell
+	GetCell(*GetCellRequest, grpc.ServerStreamingServer[CellResponse]) error
 	// Other
 	ResetDatabase(context.Context, *Empty) (*Empty, error)
 	mustEmbedUnimplementedDataLoaderServer()
@@ -607,6 +657,9 @@ func (UnimplementedDataLoaderServer) GetNodes(*GetNodesRequest, grpc.ServerStrea
 func (UnimplementedDataLoaderServer) GetNode(context.Context, *IdRequest) (*Node, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetNode not implemented")
 }
+func (UnimplementedDataLoaderServer) GetChildNodes(*IdRequest, grpc.ServerStreamingServer[ChildNodeResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method GetChildNodes not implemented")
+}
 func (UnimplementedDataLoaderServer) CreateNode(context.Context, *CreateNodeRequest) (*Node, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateNode not implemented")
 }
@@ -615,6 +668,9 @@ func (UnimplementedDataLoaderServer) CreateNodeStream(grpc.BidiStreamingServer[C
 }
 func (UnimplementedDataLoaderServer) DeleteNode(context.Context, *IdRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteNode not implemented")
+}
+func (UnimplementedDataLoaderServer) GetCell(*GetCellRequest, grpc.ServerStreamingServer[CellResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method GetCell not implemented")
 }
 func (UnimplementedDataLoaderServer) ResetDatabase(context.Context, *Empty) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ResetDatabase not implemented")
@@ -1033,6 +1089,17 @@ func _DataLoader_GetNode_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DataLoader_GetChildNodes_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(IdRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DataLoaderServer).GetChildNodes(m, &grpc.GenericServerStream[IdRequest, ChildNodeResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetChildNodesServer = grpc.ServerStreamingServer[ChildNodeResponse]
+
 func _DataLoader_CreateNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateNodeRequest)
 	if err := dec(in); err != nil {
@@ -1075,6 +1142,17 @@ func _DataLoader_DeleteNode_Handler(srv interface{}, ctx context.Context, dec fu
 	}
 	return interceptor(ctx, in, info, handler)
 }
+
+func _DataLoader_GetCell_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetCellRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DataLoaderServer).GetCell(m, &grpc.GenericServerStream[GetCellRequest, CellResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetCellServer = grpc.ServerStreamingServer[CellResponse]
 
 func _DataLoader_ResetDatabase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
@@ -1232,10 +1310,20 @@ var DataLoader_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 		{
+			StreamName:    "getChildNodes",
+			Handler:       _DataLoader_GetChildNodes_Handler,
+			ServerStreams: true,
+		},
+		{
 			StreamName:    "createNodeStream",
 			Handler:       _DataLoader_CreateNodeStream_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
+		},
+		{
+			StreamName:    "getCell",
+			Handler:       _DataLoader_GetCell_Handler,
+			ServerStreams: true,
 		},
 	},
 	Metadata: "dataloader.proto",

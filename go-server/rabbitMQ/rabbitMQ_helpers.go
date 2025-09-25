@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"strconv"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"

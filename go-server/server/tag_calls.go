@@ -9,6 +9,7 @@ import (
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
 	pb "m3.dataloader/dataloader"
+	rmq "m3.dataloader/rabbitMQ"
 )
 
 func (s *DataLoaderServer) GetTags(request *pb.GetTagsRequest, stream pb.DataLoader_GetTagsServer) error {

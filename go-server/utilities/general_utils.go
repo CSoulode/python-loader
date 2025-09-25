@@ -6,7 +6,7 @@ import (
 	"strconv"
 )
 
-func mustGetEnv(key string) string {
+func MustGetEnv(key string) string {
 	value := os.Getenv(key)
 	if value == "" {
 		log.Fatalf("Environment variable %s is required but not set", key)
@@ -14,7 +14,7 @@ func mustGetEnv(key string) string {
 	return value
 }
 
-func mustGetEnvInt(key string) int {
+func MustGetEnvInt(key string) int {
 	value := os.Getenv(key)
 	if value == "" {
 		log.Fatalf("Environment variable %s is required but not set", key)

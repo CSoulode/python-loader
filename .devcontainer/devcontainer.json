@@ -13,7 +13,8 @@
 
   "runArgs": [
     "--publish", "50051:50051",
-    "--publish", "8080:8080"
+    "--publish", "8080:8080",
+    "--env-file", ".devcontainer/devcontainer.env"
   ],
 
   "customizations": {

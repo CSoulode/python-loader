@@ -1,24 +1,25 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"log"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 
 	"google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health"
 	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
-	status "google.golang.org/grpc/status"
+	"google.golang.org/grpc/reflection"
 
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	_ "github.com/lib/pq"
 
 	pb "m3.dataloader/dataloader"
@@ -36,6 +37,7 @@ var (
 	db_port    = gutils.MustGetEnvInt("DB_PORT")
 	sv_host    = gutils.MustGetEnv("SV_HOST")
 	sv_port    = gutils.MustGetEnvInt("SV_PORT")
+	http_port  = gutils.MustGetEnvInt("HTTP_PORT")
 	BATCH_SIZE = gutils.MustGetEnvInt("BATCH_SIZE")
 )
 
@@ -377,23 +379,25 @@ func main() {
 		db_host, // host
 		db_port) // port
 
+	grpcAddr := sv_host + ":" + strconv.Itoa(sv_port)
 	server, err := NewDataLoaderServer(conn_str)
 	if err != nil {
 		log.Fatalf("Error creating server: %v", err)
 	}
 	defer server.Close()
 
-	prod = rmq.ProducerConnexionInit()
-	defer prod.ConnexionEnd()
+	// Commented out for the time being as RabbitMQ is not used during http protocol testing.
+	//prod = rmq.ProducerConnexionInit()
+	//defer prod.ConnexionEnd()
 
-	go listenForTaggingMessage(server)
+	//go listenForTaggingMessage(server)
 
-	go listenForHierarchyMessage(server)
+	//go listenForHierarchyMessage(server)
 
 	// Create a TCP listener for the gRPC server
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", sv_host, sv_port))
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.Fatalf("failed to listen on %s: %v", grpcAddr, err)
 	}
 
 	// Create and register the implementation of the gRPC server
@@ -401,9 +405,43 @@ func main() {
 	healthcheck := health.NewServer()
 	healthgrpc.RegisterHealthServer(grpc_server, healthcheck)
 	pb.RegisterDataLoaderServer(grpc_server, server)
-	log.Println("gRPC server listening on port 50051")
-	if err := grpc_server.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+	reflection.Register(grpc_server)
+	go func() {
+		log.Printf("gRPC server listening on %s", grpcAddr)
+		if err := grpc_server.Serve(lis); err != nil {
+			log.Fatalf("gRPC serve error: %v", err)
+		}
+		healthcheck.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+	}()
+
+	grpcConn, err := grpc.Dial(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("failed to dial gRPC server: %v", err)
 	}
-	healthcheck.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+	defer grpcConn.Close()
+	client := pb.NewDataLoaderClient(grpcConn)
+
+	gwMux := runtime.NewServeMux()
+	if err := pb.RegisterDataLoaderHandlerFromEndpoint(context.Background(), gwMux, grpcAddr,
+		[]grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
+	); err != nil {
+		log.Fatalf("failed to register HTTP gateway: %v", err)
+	}
+
+	httpMux := http.NewServeMux()
+
+	// Custom handlers for specific endpoints
+	httpMux.HandleFunc("/tagset", GetTagsetsHandler(client))
+	httpMux.HandleFunc("/node/{parentId}/children", GetChildNodesHandler(client))
+	httpMux.HandleFunc("/cell", GetCellHandler(client))
+
+	// 5) Fallback to the generated gateway for everything else
+	httpMux.Handle("/", gwMux)
+
+	// 6) Start HTTP server
+	addr := fmt.Sprintf(":%d", http_port)
+	log.Printf("REST gateway listening on %s", addr)
+	if err := http.ListenAndServe(addr, httpMux); err != nil {
+		log.Fatalf("HTTP serve error: %v", err)
+	}
 }

@@ -7,6 +7,7 @@
 package dataloader
 
 import (
+	_ "google.golang.org/genproto/googleapis/api/annotations"
 	status "google.golang.org/genproto/googleapis/rpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -2759,12 +2760,293 @@ func (*StreamingNodeResponse_Node) isStreamingNodeResponse_Message() {}
 
 func (*StreamingNodeResponse_Error) isStreamingNodeResponse_Message() {}
 
+type ChildNodeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`             // Name of the node
+	ParentNode    *ChildNodeResponse     `protobuf:"bytes,3,opt,name=parentNode,proto3" json:"parentNode,omitempty"` // Parent of the node, if any
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChildNodeResponse) Reset() {
+	*x = ChildNodeResponse{}
+	mi := &file_dataloader_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChildNodeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChildNodeResponse) ProtoMessage() {}
+
+func (x *ChildNodeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_dataloader_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChildNodeResponse.ProtoReflect.Descriptor instead.
+func (*ChildNodeResponse) Descriptor() ([]byte, []int) {
+	return file_dataloader_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *ChildNodeResponse) GetId() int32 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *ChildNodeResponse) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ChildNodeResponse) GetParentNode() *ChildNodeResponse {
+	if x != nil {
+		return x.ParentNode
+	}
+	return nil
+}
+
+// Cell
+type GetCellRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	XAxis         string                 `protobuf:"bytes,1,opt,name=xAxis,proto3" json:"xAxis,omitempty"`
+	YAxis         string                 `protobuf:"bytes,2,opt,name=yAxis,proto3" json:"yAxis,omitempty"`
+	ZAxis         string                 `protobuf:"bytes,3,opt,name=zAxis,proto3" json:"zAxis,omitempty"`
+	Filters       string                 `protobuf:"bytes,4,opt,name=filters,proto3" json:"filters,omitempty"`
+	All           string                 `protobuf:"bytes,5,opt,name=all,proto3" json:"all,omitempty"`
+	Timeline      string                 `protobuf:"bytes,6,opt,name=timeline,proto3" json:"timeline,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCellRequest) Reset() {
+	*x = GetCellRequest{}
+	mi := &file_dataloader_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCellRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCellRequest) ProtoMessage() {}
+
+func (x *GetCellRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dataloader_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCellRequest.ProtoReflect.Descriptor instead.
+func (*GetCellRequest) Descriptor() ([]byte, []int) {
+	return file_dataloader_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *GetCellRequest) GetXAxis() string {
+	if x != nil {
+		return x.XAxis
+	}
+	return ""
+}
+
+func (x *GetCellRequest) GetYAxis() string {
+	if x != nil {
+		return x.YAxis
+	}
+	return ""
+}
+
+func (x *GetCellRequest) GetZAxis() string {
+	if x != nil {
+		return x.ZAxis
+	}
+	return ""
+}
+
+func (x *GetCellRequest) GetFilters() string {
+	if x != nil {
+		return x.Filters
+	}
+	return ""
+}
+
+func (x *GetCellRequest) GetAll() string {
+	if x != nil {
+		return x.All
+	}
+	return ""
+}
+
+func (x *GetCellRequest) GetTimeline() string {
+	if x != nil {
+		return x.Timeline
+	}
+	return ""
+}
+
+type CellResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	X             int32                  `protobuf:"varint,1,opt,name=x,proto3" json:"x,omitempty"`
+	Y             int32                  `protobuf:"varint,2,opt,name=y,proto3" json:"y,omitempty"`
+	Z             int32                  `protobuf:"varint,3,opt,name=z,proto3" json:"z,omitempty"`
+	Count         int32                  `protobuf:"varint,4,opt,name=count,proto3" json:"count,omitempty"` // The value of the cell, e.g. the
+	CubeObjects   []*CubeObject          `protobuf:"bytes,5,rep,name=cubeObjects,proto3" json:"cubeObjects,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CellResponse) Reset() {
+	*x = CellResponse{}
+	mi := &file_dataloader_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CellResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CellResponse) ProtoMessage() {}
+
+func (x *CellResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_dataloader_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CellResponse.ProtoReflect.Descriptor instead.
+func (*CellResponse) Descriptor() ([]byte, []int) {
+	return file_dataloader_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *CellResponse) GetX() int32 {
+	if x != nil {
+		return x.X
+	}
+	return 0
+}
+
+func (x *CellResponse) GetY() int32 {
+	if x != nil {
+		return x.Y
+	}
+	return 0
+}
+
+func (x *CellResponse) GetZ() int32 {
+	if x != nil {
+		return x.Z
+	}
+	return 0
+}
+
+func (x *CellResponse) GetCount() int32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+func (x *CellResponse) GetCubeObjects() []*CubeObject {
+	if x != nil {
+		return x.CubeObjects
+	}
+	return nil
+}
+
+type CubeObject struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	FileUri       string                 `protobuf:"bytes,2,opt,name=fileUri,proto3" json:"fileUri,omitempty"`
+	ThumbnailUri  string                 `protobuf:"bytes,3,opt,name=thumbnailUri,proto3" json:"thumbnailUri,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CubeObject) Reset() {
+	*x = CubeObject{}
+	mi := &file_dataloader_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CubeObject) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CubeObject) ProtoMessage() {}
+
+func (x *CubeObject) ProtoReflect() protoreflect.Message {
+	mi := &file_dataloader_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CubeObject.ProtoReflect.Descriptor instead.
+func (*CubeObject) Descriptor() ([]byte, []int) {
+	return file_dataloader_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *CubeObject) GetId() int32 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *CubeObject) GetFileUri() string {
+	if x != nil {
+		return x.FileUri
+	}
+	return ""
+}
+
+func (x *CubeObject) GetThumbnailUri() string {
+	if x != nil {
+		return x.ThumbnailUri
+	}
+	return ""
+}
+
 var File_dataloader_proto protoreflect.FileDescriptor
 
 const file_dataloader_proto_rawDesc = "" +
 	"\n" +
 	"\x10dataloader.proto\x12\n" +
-	"dataloader\x1a\x17google/rpc/status.proto\"\a\n" +
+	"dataloader\x1a\x17google/rpc/status.proto\x1a\x1cgoogle/api/annotations.proto\"\a\n" +
 	"\x05Empty\"\x1b\n" +
 	"\tIdRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\"\x1c\n" +
@@ -2925,7 +3207,31 @@ const file_dataloader_proto_rawDesc = "" +
 	"\x15StreamingNodeResponse\x12&\n" +
 	"\x04node\x18\x01 \x01(\v2\x10.dataloader.NodeH\x00R\x04node\x12*\n" +
 	"\x05error\x18\x02 \x01(\v2\x12.google.rpc.StatusH\x00R\x05errorB\t\n" +
-	"\amessage2\x9e\x11\n" +
+	"\amessage\"v\n" +
+	"\x11ChildNodeResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12=\n" +
+	"\n" +
+	"parentNode\x18\x03 \x01(\v2\x1d.dataloader.ChildNodeResponseR\n" +
+	"parentNode\"\x9a\x01\n" +
+	"\x0eGetCellRequest\x12\x14\n" +
+	"\x05xAxis\x18\x01 \x01(\tR\x05xAxis\x12\x14\n" +
+	"\x05yAxis\x18\x02 \x01(\tR\x05yAxis\x12\x14\n" +
+	"\x05zAxis\x18\x03 \x01(\tR\x05zAxis\x12\x18\n" +
+	"\afilters\x18\x04 \x01(\tR\afilters\x12\x10\n" +
+	"\x03all\x18\x05 \x01(\tR\x03all\x12\x1a\n" +
+	"\btimeline\x18\x06 \x01(\tR\btimeline\"\x88\x01\n" +
+	"\fCellResponse\x12\f\n" +
+	"\x01x\x18\x01 \x01(\x05R\x01x\x12\f\n" +
+	"\x01y\x18\x02 \x01(\x05R\x01y\x12\f\n" +
+	"\x01z\x18\x03 \x01(\x05R\x01z\x12\x14\n" +
+	"\x05count\x18\x04 \x01(\x05R\x05count\x128\n" +
+	"\vcubeObjects\x18\x05 \x03(\v2\x16.dataloader.CubeObjectR\vcubeObjects\"Z\n" +
+	"\n" +
+	"CubeObject\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x18\n" +
+	"\afileUri\x18\x02 \x01(\tR\afileUri\x12\"\n" +
+	"\fthumbnailUri\x18\x03 \x01(\tR\fthumbnailUri2\xf9\x12\n" +
 	"\n" +
 	"DataLoader\x12Q\n" +
 	"\tgetMedias\x12\x1c.dataloader.GetMediasRequest\x1a\".dataloader.StreamingMediaResponse\"\x000\x01\x12:\n" +
@@ -2933,10 +3239,10 @@ const file_dataloader_proto_rawDesc = "" +
 	"\rgetMediaByURI\x12 .dataloader.GetMediaByURIRequest\x1a\x11.dataloader.Media\"\x00\x125\n" +
 	"\vcreateMedia\x12\x11.dataloader.Media\x1a\x11.dataloader.Media\"\x00\x12S\n" +
 	"\x11createMediaStream\x12\x11.dataloader.Media\x1a%.dataloader.CreateMediaStreamResponse\"\x00(\x010\x01\x129\n" +
-	"\vdeleteMedia\x12\x15.dataloader.IdRequest\x1a\x11.dataloader.Empty\"\x00\x12T\n" +
+	"\vdeleteMedia\x12\x15.dataloader.IdRequest\x1a\x11.dataloader.Empty\"\x00\x12c\n" +
 	"\n" +
-	"getTagSets\x12\x1d.dataloader.GetTagSetsRequest\x1a#.dataloader.StreamingTagSetResponse\"\x000\x01\x12<\n" +
-	"\rgetTagSetById\x12\x15.dataloader.IdRequest\x1a\x12.dataloader.TagSet\"\x00\x12K\n" +
+	"getTagSets\x12\x1d.dataloader.GetTagSetsRequest\x1a#.dataloader.StreamingTagSetResponse\"\x0f\x82\xd3\xe4\x93\x02\t\x12\a/tagset0\x01\x12P\n" +
+	"\rgetTagSetById\x12\x15.dataloader.IdRequest\x1a\x12.dataloader.TagSet\"\x14\x82\xd3\xe4\x93\x02\x0e\x12\f/tagset/{id}\x12K\n" +
 	"\x0fgetTagSetByName\x12\".dataloader.GetTagSetRequestByName\x1a\x12.dataloader.TagSet\"\x00\x12E\n" +
 	"\fcreateTagSet\x12\x1f.dataloader.CreateTagSetRequest\x1a\x12.dataloader.TagSet\"\x00\x12K\n" +
 	"\agetTags\x12\x1a.dataloader.GetTagsRequest\x1a .dataloader.StreamingTagResponse\"\x000\x01\x122\n" +
@@ -2954,12 +3260,14 @@ const file_dataloader_proto_rawDesc = "" +
 	"\fgetHierarchy\x12\x15.dataloader.IdRequest\x1a\x15.dataloader.Hierarchy\"\x00\x12N\n" +
 	"\x0fcreateHierarchy\x12\".dataloader.CreateHierarchyRequest\x1a\x15.dataloader.Hierarchy\"\x00\x12N\n" +
 	"\bgetNodes\x12\x1b.dataloader.GetNodesRequest\x1a!.dataloader.StreamingNodeResponse\"\x000\x01\x124\n" +
-	"\agetNode\x12\x15.dataloader.IdRequest\x1a\x10.dataloader.Node\"\x00\x12?\n" +
+	"\agetNode\x12\x15.dataloader.IdRequest\x1a\x10.dataloader.Node\"\x00\x12d\n" +
+	"\rgetChildNodes\x12\x15.dataloader.IdRequest\x1a\x1d.dataloader.ChildNodeResponse\"\x1b\x82\xd3\xe4\x93\x02\x15\x12\x13/node/{id}/children0\x01\x12?\n" +
 	"\n" +
 	"createNode\x12\x1d.dataloader.CreateNodeRequest\x1a\x10.dataloader.Node\"\x00\x12Z\n" +
 	"\x10createNodeStream\x12\x1d.dataloader.CreateNodeRequest\x1a!.dataloader.StreamingNodeResponse\"\x00(\x010\x01\x128\n" +
 	"\n" +
-	"deleteNode\x12\x15.dataloader.IdRequest\x1a\x11.dataloader.Empty\"\x00\x127\n" +
+	"deleteNode\x12\x15.dataloader.IdRequest\x1a\x11.dataloader.Empty\"\x00\x12P\n" +
+	"\agetCell\x12\x1a.dataloader.GetCellRequest\x1a\x18.dataloader.CellResponse\"\r\x82\xd3\xe4\x93\x02\a\x12\x05/cell0\x01\x127\n" +
 	"\rresetDatabase\x12\x11.dataloader.Empty\x1a\x11.dataloader.Empty\"\x00B\x1aZ\x18m3.dataloader/dataloaderb\x06proto3"
 
 var (
@@ -2974,7 +3282,7 @@ func file_dataloader_proto_rawDescGZIP() []byte {
 	return file_dataloader_proto_rawDescData
 }
 
-var file_dataloader_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
+var file_dataloader_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
 var file_dataloader_proto_goTypes = []any{
 	(*Empty)(nil),                       // 0: dataloader.Empty
 	(*IdRequest)(nil),                   // 1: dataloader.IdRequest
@@ -3015,15 +3323,19 @@ var file_dataloader_proto_goTypes = []any{
 	(*CreateNodeRequest)(nil),           // 36: dataloader.CreateNodeRequest
 	(*GetNodesRequest)(nil),             // 37: dataloader.GetNodesRequest
 	(*StreamingNodeResponse)(nil),       // 38: dataloader.StreamingNodeResponse
-	nil,                                 // 39: dataloader.CreateTagStreamResponse.IdMapEntry
-	(*status.Status)(nil),               // 40: google.rpc.Status
+	(*ChildNodeResponse)(nil),           // 39: dataloader.ChildNodeResponse
+	(*GetCellRequest)(nil),              // 40: dataloader.GetCellRequest
+	(*CellResponse)(nil),                // 41: dataloader.CellResponse
+	(*CubeObject)(nil),                  // 42: dataloader.CubeObject
+	nil,                                 // 43: dataloader.CreateTagStreamResponse.IdMapEntry
+	(*status.Status)(nil),               // 44: google.rpc.Status
 }
 var file_dataloader_proto_depIdxs = []int32{
 	4,  // 0: dataloader.StreamingMediaResponse.media:type_name -> dataloader.Media
-	40, // 1: dataloader.StreamingMediaResponse.error:type_name -> google.rpc.Status
-	40, // 2: dataloader.CreateMediaStreamResponse.error:type_name -> google.rpc.Status
+	44, // 1: dataloader.StreamingMediaResponse.error:type_name -> google.rpc.Status
+	44, // 2: dataloader.CreateMediaStreamResponse.error:type_name -> google.rpc.Status
 	9,  // 3: dataloader.StreamingTagSetResponse.tagset:type_name -> dataloader.TagSet
-	40, // 4: dataloader.StreamingTagSetResponse.error:type_name -> google.rpc.Status
+	44, // 4: dataloader.StreamingTagSetResponse.error:type_name -> google.rpc.Status
 	15, // 5: dataloader.Tag.alphanumerical:type_name -> dataloader.AlphanumericalValue
 	19, // 6: dataloader.Tag.timestamp:type_name -> dataloader.TimeStampValue
 	18, // 7: dataloader.Tag.time:type_name -> dataloader.TimeValue
@@ -3035,95 +3347,101 @@ var file_dataloader_proto_depIdxs = []int32{
 	17, // 13: dataloader.CreateTagRequest.date:type_name -> dataloader.DateValue
 	16, // 14: dataloader.CreateTagRequest.numerical:type_name -> dataloader.NumericalValue
 	14, // 15: dataloader.StreamingTagResponse.tag:type_name -> dataloader.Tag
-	40, // 16: dataloader.StreamingTagResponse.error:type_name -> google.rpc.Status
+	44, // 16: dataloader.StreamingTagResponse.error:type_name -> google.rpc.Status
 	15, // 17: dataloader.CreateTagStreamRequest.alphanumerical:type_name -> dataloader.AlphanumericalValue
 	19, // 18: dataloader.CreateTagStreamRequest.timestamp:type_name -> dataloader.TimeStampValue
 	18, // 19: dataloader.CreateTagStreamRequest.time:type_name -> dataloader.TimeValue
 	17, // 20: dataloader.CreateTagStreamRequest.date:type_name -> dataloader.DateValue
 	16, // 21: dataloader.CreateTagStreamRequest.numerical:type_name -> dataloader.NumericalValue
-	39, // 22: dataloader.CreateTagStreamResponse.id_map:type_name -> dataloader.CreateTagStreamResponse.IdMapEntry
+	43, // 22: dataloader.CreateTagStreamResponse.id_map:type_name -> dataloader.CreateTagStreamResponse.IdMapEntry
 	15, // 23: dataloader.ChangeTagNameRequest.newAlphanumerical:type_name -> dataloader.AlphanumericalValue
 	19, // 24: dataloader.ChangeTagNameRequest.newTimestamp:type_name -> dataloader.TimeStampValue
 	18, // 25: dataloader.ChangeTagNameRequest.newTime:type_name -> dataloader.TimeValue
 	17, // 26: dataloader.ChangeTagNameRequest.newDate:type_name -> dataloader.DateValue
 	16, // 27: dataloader.ChangeTagNameRequest.newNumerical:type_name -> dataloader.NumericalValue
 	26, // 28: dataloader.StreamingTaggingResponse.tagging:type_name -> dataloader.Tagging
-	40, // 29: dataloader.StreamingTaggingResponse.error:type_name -> google.rpc.Status
-	40, // 30: dataloader.CreateTaggingStreamResponse.error:type_name -> google.rpc.Status
+	44, // 29: dataloader.StreamingTaggingResponse.error:type_name -> google.rpc.Status
+	44, // 30: dataloader.CreateTaggingStreamResponse.error:type_name -> google.rpc.Status
 	15, // 31: dataloader.ChangeTaggingRequest.alphanumerical:type_name -> dataloader.AlphanumericalValue
 	19, // 32: dataloader.ChangeTaggingRequest.timestamp:type_name -> dataloader.TimeStampValue
 	18, // 33: dataloader.ChangeTaggingRequest.time:type_name -> dataloader.TimeValue
 	17, // 34: dataloader.ChangeTaggingRequest.date:type_name -> dataloader.DateValue
 	16, // 35: dataloader.ChangeTaggingRequest.numerical:type_name -> dataloader.NumericalValue
 	31, // 36: dataloader.StreamingHierarchyResponse.hierarchy:type_name -> dataloader.Hierarchy
-	40, // 37: dataloader.StreamingHierarchyResponse.error:type_name -> google.rpc.Status
+	44, // 37: dataloader.StreamingHierarchyResponse.error:type_name -> google.rpc.Status
 	35, // 38: dataloader.StreamingNodeResponse.node:type_name -> dataloader.Node
-	40, // 39: dataloader.StreamingNodeResponse.error:type_name -> google.rpc.Status
-	5,  // 40: dataloader.DataLoader.getMedias:input_type -> dataloader.GetMediasRequest
-	1,  // 41: dataloader.DataLoader.getMediaById:input_type -> dataloader.IdRequest
-	6,  // 42: dataloader.DataLoader.getMediaByURI:input_type -> dataloader.GetMediaByURIRequest
-	4,  // 43: dataloader.DataLoader.createMedia:input_type -> dataloader.Media
-	4,  // 44: dataloader.DataLoader.createMediaStream:input_type -> dataloader.Media
-	1,  // 45: dataloader.DataLoader.deleteMedia:input_type -> dataloader.IdRequest
-	10, // 46: dataloader.DataLoader.getTagSets:input_type -> dataloader.GetTagSetsRequest
-	1,  // 47: dataloader.DataLoader.getTagSetById:input_type -> dataloader.IdRequest
-	11, // 48: dataloader.DataLoader.getTagSetByName:input_type -> dataloader.GetTagSetRequestByName
-	12, // 49: dataloader.DataLoader.createTagSet:input_type -> dataloader.CreateTagSetRequest
-	20, // 50: dataloader.DataLoader.getTags:input_type -> dataloader.GetTagsRequest
-	1,  // 51: dataloader.DataLoader.getTag:input_type -> dataloader.IdRequest
-	21, // 52: dataloader.DataLoader.createTag:input_type -> dataloader.CreateTagRequest
-	23, // 53: dataloader.DataLoader.createTagStream:input_type -> dataloader.CreateTagStreamRequest
-	25, // 54: dataloader.DataLoader.changeTagName:input_type -> dataloader.ChangeTagNameRequest
-	0,  // 55: dataloader.DataLoader.getTaggings:input_type -> dataloader.Empty
-	1,  // 56: dataloader.DataLoader.getMediasWithTag:input_type -> dataloader.IdRequest
-	1,  // 57: dataloader.DataLoader.getMediaTags:input_type -> dataloader.IdRequest
-	27, // 58: dataloader.DataLoader.createTagging:input_type -> dataloader.CreateTaggingRequest
-	27, // 59: dataloader.DataLoader.createTaggingStream:input_type -> dataloader.CreateTaggingRequest
-	30, // 60: dataloader.DataLoader.changeTagging:input_type -> dataloader.ChangeTaggingRequest
-	32, // 61: dataloader.DataLoader.getHierarchies:input_type -> dataloader.GetHierarchiesRequest
-	1,  // 62: dataloader.DataLoader.getHierarchy:input_type -> dataloader.IdRequest
-	33, // 63: dataloader.DataLoader.createHierarchy:input_type -> dataloader.CreateHierarchyRequest
-	37, // 64: dataloader.DataLoader.getNodes:input_type -> dataloader.GetNodesRequest
-	1,  // 65: dataloader.DataLoader.getNode:input_type -> dataloader.IdRequest
-	36, // 66: dataloader.DataLoader.createNode:input_type -> dataloader.CreateNodeRequest
-	36, // 67: dataloader.DataLoader.createNodeStream:input_type -> dataloader.CreateNodeRequest
-	1,  // 68: dataloader.DataLoader.deleteNode:input_type -> dataloader.IdRequest
-	0,  // 69: dataloader.DataLoader.resetDatabase:input_type -> dataloader.Empty
-	7,  // 70: dataloader.DataLoader.getMedias:output_type -> dataloader.StreamingMediaResponse
-	4,  // 71: dataloader.DataLoader.getMediaById:output_type -> dataloader.Media
-	4,  // 72: dataloader.DataLoader.getMediaByURI:output_type -> dataloader.Media
-	4,  // 73: dataloader.DataLoader.createMedia:output_type -> dataloader.Media
-	8,  // 74: dataloader.DataLoader.createMediaStream:output_type -> dataloader.CreateMediaStreamResponse
-	0,  // 75: dataloader.DataLoader.deleteMedia:output_type -> dataloader.Empty
-	13, // 76: dataloader.DataLoader.getTagSets:output_type -> dataloader.StreamingTagSetResponse
-	9,  // 77: dataloader.DataLoader.getTagSetById:output_type -> dataloader.TagSet
-	9,  // 78: dataloader.DataLoader.getTagSetByName:output_type -> dataloader.TagSet
-	9,  // 79: dataloader.DataLoader.createTagSet:output_type -> dataloader.TagSet
-	22, // 80: dataloader.DataLoader.getTags:output_type -> dataloader.StreamingTagResponse
-	14, // 81: dataloader.DataLoader.getTag:output_type -> dataloader.Tag
-	14, // 82: dataloader.DataLoader.createTag:output_type -> dataloader.Tag
-	24, // 83: dataloader.DataLoader.createTagStream:output_type -> dataloader.CreateTagStreamResponse
-	0,  // 84: dataloader.DataLoader.changeTagName:output_type -> dataloader.Empty
-	28, // 85: dataloader.DataLoader.getTaggings:output_type -> dataloader.StreamingTaggingResponse
-	3,  // 86: dataloader.DataLoader.getMediasWithTag:output_type -> dataloader.RepeatedIdResponse
-	3,  // 87: dataloader.DataLoader.getMediaTags:output_type -> dataloader.RepeatedIdResponse
-	26, // 88: dataloader.DataLoader.createTagging:output_type -> dataloader.Tagging
-	29, // 89: dataloader.DataLoader.createTaggingStream:output_type -> dataloader.CreateTaggingStreamResponse
-	0,  // 90: dataloader.DataLoader.changeTagging:output_type -> dataloader.Empty
-	34, // 91: dataloader.DataLoader.getHierarchies:output_type -> dataloader.StreamingHierarchyResponse
-	31, // 92: dataloader.DataLoader.getHierarchy:output_type -> dataloader.Hierarchy
-	31, // 93: dataloader.DataLoader.createHierarchy:output_type -> dataloader.Hierarchy
-	38, // 94: dataloader.DataLoader.getNodes:output_type -> dataloader.StreamingNodeResponse
-	35, // 95: dataloader.DataLoader.getNode:output_type -> dataloader.Node
-	35, // 96: dataloader.DataLoader.createNode:output_type -> dataloader.Node
-	38, // 97: dataloader.DataLoader.createNodeStream:output_type -> dataloader.StreamingNodeResponse
-	0,  // 98: dataloader.DataLoader.deleteNode:output_type -> dataloader.Empty
-	0,  // 99: dataloader.DataLoader.resetDatabase:output_type -> dataloader.Empty
-	70, // [70:100] is the sub-list for method output_type
-	40, // [40:70] is the sub-list for method input_type
-	40, // [40:40] is the sub-list for extension type_name
-	40, // [40:40] is the sub-list for extension extendee
-	0,  // [0:40] is the sub-list for field type_name
+	44, // 39: dataloader.StreamingNodeResponse.error:type_name -> google.rpc.Status
+	39, // 40: dataloader.ChildNodeResponse.parentNode:type_name -> dataloader.ChildNodeResponse
+	42, // 41: dataloader.CellResponse.cubeObjects:type_name -> dataloader.CubeObject
+	5,  // 42: dataloader.DataLoader.getMedias:input_type -> dataloader.GetMediasRequest
+	1,  // 43: dataloader.DataLoader.getMediaById:input_type -> dataloader.IdRequest
+	6,  // 44: dataloader.DataLoader.getMediaByURI:input_type -> dataloader.GetMediaByURIRequest
+	4,  // 45: dataloader.DataLoader.createMedia:input_type -> dataloader.Media
+	4,  // 46: dataloader.DataLoader.createMediaStream:input_type -> dataloader.Media
+	1,  // 47: dataloader.DataLoader.deleteMedia:input_type -> dataloader.IdRequest
+	10, // 48: dataloader.DataLoader.getTagSets:input_type -> dataloader.GetTagSetsRequest
+	1,  // 49: dataloader.DataLoader.getTagSetById:input_type -> dataloader.IdRequest
+	11, // 50: dataloader.DataLoader.getTagSetByName:input_type -> dataloader.GetTagSetRequestByName
+	12, // 51: dataloader.DataLoader.createTagSet:input_type -> dataloader.CreateTagSetRequest
+	20, // 52: dataloader.DataLoader.getTags:input_type -> dataloader.GetTagsRequest
+	1,  // 53: dataloader.DataLoader.getTag:input_type -> dataloader.IdRequest
+	21, // 54: dataloader.DataLoader.createTag:input_type -> dataloader.CreateTagRequest
+	23, // 55: dataloader.DataLoader.createTagStream:input_type -> dataloader.CreateTagStreamRequest
+	25, // 56: dataloader.DataLoader.changeTagName:input_type -> dataloader.ChangeTagNameRequest
+	0,  // 57: dataloader.DataLoader.getTaggings:input_type -> dataloader.Empty
+	1,  // 58: dataloader.DataLoader.getMediasWithTag:input_type -> dataloader.IdRequest
+	1,  // 59: dataloader.DataLoader.getMediaTags:input_type -> dataloader.IdRequest
+	27, // 60: dataloader.DataLoader.createTagging:input_type -> dataloader.CreateTaggingRequest
+	27, // 61: dataloader.DataLoader.createTaggingStream:input_type -> dataloader.CreateTaggingRequest
+	30, // 62: dataloader.DataLoader.changeTagging:input_type -> dataloader.ChangeTaggingRequest
+	32, // 63: dataloader.DataLoader.getHierarchies:input_type -> dataloader.GetHierarchiesRequest
+	1,  // 64: dataloader.DataLoader.getHierarchy:input_type -> dataloader.IdRequest
+	33, // 65: dataloader.DataLoader.createHierarchy:input_type -> dataloader.CreateHierarchyRequest
+	37, // 66: dataloader.DataLoader.getNodes:input_type -> dataloader.GetNodesRequest
+	1,  // 67: dataloader.DataLoader.getNode:input_type -> dataloader.IdRequest
+	1,  // 68: dataloader.DataLoader.getChildNodes:input_type -> dataloader.IdRequest
+	36, // 69: dataloader.DataLoader.createNode:input_type -> dataloader.CreateNodeRequest
+	36, // 70: dataloader.DataLoader.createNodeStream:input_type -> dataloader.CreateNodeRequest
+	1,  // 71: dataloader.DataLoader.deleteNode:input_type -> dataloader.IdRequest
+	40, // 72: dataloader.DataLoader.getCell:input_type -> dataloader.GetCellRequest
+	0,  // 73: dataloader.DataLoader.resetDatabase:input_type -> dataloader.Empty
+	7,  // 74: dataloader.DataLoader.getMedias:output_type -> dataloader.StreamingMediaResponse
+	4,  // 75: dataloader.DataLoader.getMediaById:output_type -> dataloader.Media
+	4,  // 76: dataloader.DataLoader.getMediaByURI:output_type -> dataloader.Media
+	4,  // 77: dataloader.DataLoader.createMedia:output_type -> dataloader.Media
+	8,  // 78: dataloader.DataLoader.createMediaStream:output_type -> dataloader.CreateMediaStreamResponse
+	0,  // 79: dataloader.DataLoader.deleteMedia:output_type -> dataloader.Empty
+	13, // 80: dataloader.DataLoader.getTagSets:output_type -> dataloader.StreamingTagSetResponse
+	9,  // 81: dataloader.DataLoader.getTagSetById:output_type -> dataloader.TagSet
+	9,  // 82: dataloader.DataLoader.getTagSetByName:output_type -> dataloader.TagSet
+	9,  // 83: dataloader.DataLoader.createTagSet:output_type -> dataloader.TagSet
+	22, // 84: dataloader.DataLoader.getTags:output_type -> dataloader.StreamingTagResponse
+	14, // 85: dataloader.DataLoader.getTag:output_type -> dataloader.Tag
+	14, // 86: dataloader.DataLoader.createTag:output_type -> dataloader.Tag
+	24, // 87: dataloader.DataLoader.createTagStream:output_type -> dataloader.CreateTagStreamResponse
+	0,  // 88: dataloader.DataLoader.changeTagName:output_type -> dataloader.Empty
+	28, // 89: dataloader.DataLoader.getTaggings:output_type -> dataloader.StreamingTaggingResponse
+	3,  // 90: dataloader.DataLoader.getMediasWithTag:output_type -> dataloader.RepeatedIdResponse
+	3,  // 91: dataloader.DataLoader.getMediaTags:output_type -> dataloader.RepeatedIdResponse
+	26, // 92: dataloader.DataLoader.createTagging:output_type -> dataloader.Tagging
+	29, // 93: dataloader.DataLoader.createTaggingStream:output_type -> dataloader.CreateTaggingStreamResponse
+	0,  // 94: dataloader.DataLoader.changeTagging:output_type -> dataloader.Empty
+	34, // 95: dataloader.DataLoader.getHierarchies:output_type -> dataloader.StreamingHierarchyResponse
+	31, // 96: dataloader.DataLoader.getHierarchy:output_type -> dataloader.Hierarchy
+	31, // 97: dataloader.DataLoader.createHierarchy:output_type -> dataloader.Hierarchy
+	38, // 98: dataloader.DataLoader.getNodes:output_type -> dataloader.StreamingNodeResponse
+	35, // 99: dataloader.DataLoader.getNode:output_type -> dataloader.Node
+	39, // 100: dataloader.DataLoader.getChildNodes:output_type -> dataloader.ChildNodeResponse
+	35, // 101: dataloader.DataLoader.createNode:output_type -> dataloader.Node
+	38, // 102: dataloader.DataLoader.createNodeStream:output_type -> dataloader.StreamingNodeResponse
+	0,  // 103: dataloader.DataLoader.deleteNode:output_type -> dataloader.Empty
+	41, // 104: dataloader.DataLoader.getCell:output_type -> dataloader.CellResponse
+	0,  // 105: dataloader.DataLoader.resetDatabase:output_type -> dataloader.Empty
+	74, // [74:106] is the sub-list for method output_type
+	42, // [42:74] is the sub-list for method input_type
+	42, // [42:42] is the sub-list for extension type_name
+	42, // [42:42] is the sub-list for extension extendee
+	0,  // [0:42] is the sub-list for field type_name
 }
 
 func init() { file_dataloader_proto_init() }
@@ -3204,7 +3522,7 @@ func file_dataloader_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dataloader_proto_rawDesc), len(file_dataloader_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   40,
+			NumMessages:   44,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
