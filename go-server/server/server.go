@@ -395,7 +395,7 @@ func main() {
 	//go listenForHierarchyMessage(server)
 
 	// Create a TCP listener for the gRPC server
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", sv_host, sv_port))
+	lis, err := net.Listen("tcp", ":"+strconv.Itoa(sv_port))
 	if err != nil {
 		log.Fatalf("failed to listen on %s: %v", grpcAddr, err)
 	}
@@ -431,9 +431,9 @@ func main() {
 	httpMux := http.NewServeMux()
 
 	// Custom handlers for specific endpoints
-	httpMux.HandleFunc("/tagset", GetTagsetsHandler(client))
-	httpMux.HandleFunc("/node/{parentId}/children", GetChildNodesHandler(client))
-	httpMux.HandleFunc("/cell", GetCellHandler(client))
+	httpMux.HandleFunc("/api/tagset", GetTagsetsHandler(client))
+	httpMux.HandleFunc("/api/node/{parentId}/children", GetChildNodesHandler(client))
+	httpMux.HandleFunc("/api/cell", GetCellHandler(client))
 
 	// 5) Fallback to the generated gateway for everything else
 	httpMux.Handle("/", gwMux)

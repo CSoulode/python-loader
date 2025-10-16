@@ -48,7 +48,7 @@ func GetChildNodesHandler(client pb.DataLoaderClient) http.HandlerFunc {
 	}
 }
 
-// GET /tagsets?tagTypeId=1
+// GET api/tagsets?tagTypeId=1
 func GetTagsetsHandler(client pb.DataLoaderClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		req := &pb.GetTagSetsRequest{}
@@ -65,6 +65,23 @@ func GetTagsetsHandler(client pb.DataLoaderClient) http.HandlerFunc {
 		writeStreamAsJSON(w, func() (proto.Message, error) { return stream.Recv() })
 	}
 }
+
+// GET api/tagsets/:id
+/*func GetTagsetsByIdHandler(client pb.DataLoaderClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil {
+			http.Error(w, "invalid id", http.StatusBadRequest)
+			return
+		}
+		res, err := client.GetChildNodes(r.Context(), &pb.IdRequest{Id: id})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("rpc error: %v", err), http.StatusBadGateway)
+			return
+		}
+		writeStreamAsJSON(w, func() (proto.Message, error) { return stream.Recv() })
+	}
+}*/
 
 func writeStreamAsJSON(w http.ResponseWriter, recv func() (proto.Message, error)) {
 	var msgs []proto.Message

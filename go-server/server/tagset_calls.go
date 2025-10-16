@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	codes "google.golang.org/grpc/codes"
@@ -84,6 +85,88 @@ func (s *DataLoaderServer) GetTagSetById(ctx context.Context, request *pb.IdRequ
 	}
 
 	return &tagset, nil
+}
+
+func (s *DataLoaderServer) GetTagSetsById(ctx context.Context, request *pb.IdRequest) (*pb.TagSetsResponse, error) {
+	// tagset
+	var ts pb.TagSet
+	err := s.db.QueryRowContext(ctx, `SELECT id, name, tagtype_id FROM public.tagsets WHERE id = $1`, request.Id).
+		Scan(&ts.Id, &ts.Name, &ts.TagTypeId)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, status.Errorf(codes.Internal, "query tags failed: %v", err)
+	}
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to execute query: %w", err)
+	}
+
+	tagRows, err := s.db.QueryContext(ctx, `
+		SELECT id, name, tagsetId, tagTypeId, tagsetIdReplicate, tagType, objectTagRelations
+		FROM tagset_tags
+		WHERE tagsetId = $1
+	`, ts.Id)
+	if err != nil {
+		return nil, err
+	}
+	defer tagRows.Close()
+
+	//tags
+	var tags []*pb.TagInTagset
+	for tagRows.Next() {
+		var r pb.TagInTagset
+		if err := tagRows.Scan(
+			&r.Id, &r.Name, &r.TagsetId, &r.TagTypeId, &r.TagsetIdReplicate, &r.TagType, &r.ObjectTagRelations,
+		); err != nil {
+			return nil, err
+		}
+		tags = append(tags, &pb.TagInTagset{
+			Id:                 r.Id,
+			Name:               r.Name,
+			TagsetIdReplicate:  r.TagsetIdReplicate,
+			TagTypeId:          r.TagTypeId,
+			TagType:            r.TagType,
+			TagsetId:           r.TagsetId,
+			ObjectTagRelations: r.ObjectTagRelations,
+		})
+	}
+	if err := tagRows.Err(); err != nil {
+		return nil, err
+	}
+
+	hRows, err := s.db.QueryContext(ctx, `
+		SELECT id, name, tagsetId, nodes, rootNodeId
+		FROM tagset_hierarchies
+		WHERE tagsetId = $1
+	`, ts.Id)
+	if err != nil {
+		return nil, err
+	}
+	defer hRows.Close()
+
+	// hierarchies
+	var hierarchies []*pb.Hierarchy
+	for hRows.Next() {
+		var r pb.Hierarchy
+		if err := hRows.Scan(&r.Id, &r.Name, &r.TagSetId, &r.Nodes, &r.RootNodeId); err != nil {
+			return nil, err
+		}
+		hierarchies = append(hierarchies, &pb.Hierarchy{
+			Id:         r.Id,
+			Name:       r.Name,
+			TagSetId:   r.TagSetId,
+			Nodes:      r.Nodes,
+			RootNodeId: r.RootNodeId,
+		})
+	}
+	if err := hRows.Err(); err != nil {
+		return nil, err
+	}
+
+	return &pb.TagSetsResponse{
+		Id:          ts.Id,
+		Name:        ts.Name,
+		Tags:        tags,
+		Hierarchies: hierarchies,
+	}, nil
 }
 
 func (s *DataLoaderServer) GetTagSetByName(ctx context.Context, request *pb.GetTagSetRequestByName) (*pb.TagSet, error) {

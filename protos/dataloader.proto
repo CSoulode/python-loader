@@ -2,6 +2,7 @@ syntax = "proto3";
 
 import "google/rpc/status.proto";
 import "google/api/annotations.proto";
+import "google/protobuf/wrappers.proto";
 
 package dataloader;
 option go_package = "m3.dataloader/dataloader";
@@ -19,14 +20,15 @@ service DataLoader {
 	// -------------------------- TagSets
 	rpc getTagSets(GetTagSetsRequest) returns (stream StreamingTagSetResponse) {
     option (google.api.http) = {
-      get: "/tagset"
+      get: "/api/tagset"
     };
   };
 
   // Get all the tagsets stored in DB, with optional tagtype filter
-	rpc getTagSetById(IdRequest) returns (TagSet) {
+	rpc getTagSetById(IdRequest) returns (TagSet) {};
+  rpc getTagSetsById(IdRequest) returns (TagSetsResponse) {
     option (google.api.http) = {
-      get: "/tagset/{id}"
+      get: "/api/tagset/{id}"
     };
   };
 
@@ -64,20 +66,29 @@ service DataLoader {
   rpc getNode (IdRequest) returns (Node) {};                 // Get a single node with the given ID
   rpc getChildNodes (IdRequest) returns (stream ChildNodeResponse) {  // Get all child nodes of a given node ID
     option (google.api.http) = {
-      get: "/node/{id}/children"
+      get: "/api/node/{id}/children"
     }; 
   };
   rpc createNode (CreateNodeRequest) returns (Node) {};     // Create or get a single node
   rpc createNodeStream (stream CreateNodeRequest) returns (stream StreamingNodeResponse) {};    // NOT IMPLEMENTED
-  rpc deleteNode (IdRequest) returns (Empty) {}            // Delete a single node with the given ID
+  rpc deleteNode (IdRequest) returns (Empty) {};            // Delete a single node with the given ID
   
   // -------------------------- Cell
+  // Get the value of a cell in the datacube, with given axis values and optional filters
+  // The 'all' parameter can be set to "true" to get all the cells in the datacube
+  // The 'timeline' parameter can be set to "true" to get the timeline of the cell
+
   rpc getCell (GetCellRequest) returns (stream CellResponse) {
     option (google.api.http) = {
-      get: "/cell"
+      get: "/api/cell"
     };
   };
 
+  rpc getCellIncremental (GetCellRequest) returns (stream CellResponse) {};  
+  rpc getCellIncremental2 (GetCellRequest) returns (stream CellChunk) {};  
+  rpc getCellIncremental3 (GetCellRequest) returns (stream CellResponse) {}; 
+  rpc getCellIncremental4 (GetCellRequest) returns (stream CellResponse) {};  
+ 
   // Other
 	rpc resetDatabase (Empty) returns (Empty) {};
     // Reads and executes the DDL, which does 2 things: drop the schemas, and recreate all the tables and rules
@@ -157,6 +168,14 @@ message StreamingTagSetResponse {
   }
 }
 
+message TagSetsResponse {
+  int64 id = 1;
+  string name = 2;
+  repeated TagInTagset tags = 3;
+  repeated Hierarchy hierarchies = 4;
+}
+
+
 // Tags
 message Tag {
   int64 id = 1;
@@ -169,6 +188,16 @@ message Tag {
     DateValue date = 7;
     NumericalValue numerical = 8;
   }
+}
+
+message TagInTagset {
+  int64 id = 1;
+  string name = 2;
+  int64 tagsetIdReplicate = 3;
+  int64 tagTypeId = 4;
+  google.protobuf.Int64Value tagType = 5;
+  int64 tagsetId = 6;
+  google.protobuf.Int64Value ObjectTagRelations = 7;
 }
 
 message AlphanumericalValue {
@@ -294,7 +323,8 @@ message Hierarchy {
   int64 id = 1;
   string name = 2;
   int64 tagSetId = 3;
-  int64 rootNodeId = 4;  
+  int64 rootNodeId = 4; 
+  google.protobuf.Int64Value nodes = 5;
 }
 
 message GetHierarchiesRequest {
@@ -362,6 +392,11 @@ message CellResponse {
   int32 z = 3;
   int32 count = 4; // The value of the cell, e.g. the
   repeated CubeObject cubeObjects = 5;
+}
+
+message CellChunk {
+  bool authoritative = 1;
+  repeated CellResponse cells = 2;
 }
 
 message CubeObject {

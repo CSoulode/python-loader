@@ -35,7 +35,11 @@ RUN mkdir -p /usr/local/include/googleapis/google/api \
     -o /usr/local/include/googleapis/google/protobuf/any.proto \
  && curl -sSL \
       https://raw.githubusercontent.com/grpc/grpc/master/src/proto/grpc/status/status.proto \
-    -o /usr/local/include/googleapis/google/protobuf/status.proto
+    -o /usr/local/include/googleapis/google/protobuf/status.proto \
+  && curl -sSL \
+        https://raw.githubusercontent.com/protocolbuffers/protobuf/master/src/google/protobuf/wrappers.proto \
+    -o /usr/local/include/googleapis/google/protobuf/wrappers.proto
+
 
 # 3. Define the working directory inside the container
 WORKDIR /workspace

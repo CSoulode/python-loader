@@ -12,3 +12,4 @@ lsc22.json
 
 server/vbs_loader
 client/python-loader-client
+go-server/out/server/server

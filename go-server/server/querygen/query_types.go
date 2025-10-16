@@ -12,49 +12,71 @@ type ParsedAxis struct {
 	Ids  map[int]int // populated by InitializeIds
 }
 
-// InitializeIds populates p.Ids by querying the database.
-// For a "tagset", it loads all tags in that tagset (excluding the tagset’s own name) ordered by name.
-// For a "node", it finds immediate child nodes (via the get_level_from_parent_node function) ordered by their tag name.
-// Otherwise it defaults to mapping 1→1.
+// InitializeIds populates p.Ids with a stable position index per axis member.
+//   - tagset: list all tags in the set, compute display name from the appropriate subtype table,
+//     drop the tag whose display name == tagset.name, order by display name.
+//   - node:   list immediate child nodes (get_level_from_parent_node), order by the node tag's alphanumerical name.
+//   - else:   fallback 1→1.
 func (p *ParsedAxis) InitializeIds(ctx context.Context, db *sql.DB) error {
 	idList := make(map[int]int)
 	counter := 1
 
 	switch p.Type {
 	case "tagset":
-		// Load tags in the tagset, excluding the tag with the same name
+		// Resolve tag display name across all subtype tables; exclude the tag that shares the tagset's own name.
+		// NOTE: Exactly one of (a, ts, tm, d, n) will be non-null for a given tag id.
 		rows, err := db.QueryContext(ctx, `
-			SELECT t.id
-			FROM tagsets ts
-			JOIN tags t ON t.tagset_id = ts.id
-			WHERE ts.id = $1
-			  AND t.name <> ts.name
-			ORDER BY t.name
+			SELECT t.id,
+			       COALESCE(
+			         a.name,                                   -- alphanumerical_tags.name (text)
+			         to_char(ts.name, 'YYYY-MM-DD HH24:MI:SS'),-- timestamp_tags.name
+			         to_char(tm.name, 'HH24:MI'),              -- time_tags.name
+			         to_char(d.name,  'YYYY-MM-DD'),           -- date_tags.name
+			         n.name::text                              -- numerical_tags.name
+			       ) AS disp_name
+			FROM tagsets s
+			JOIN tags t ON t.tagset_id = s.id
+			LEFT JOIN alphanumerical_tags a ON a.id = t.id
+			LEFT JOIN timestamp_tags      ts ON ts.id = t.id
+			LEFT JOIN time_tags           tm ON tm.id = t.id
+			LEFT JOIN date_tags            d ON  d.id = t.id
+			LEFT JOIN numerical_tags       n ON  n.id = t.id
+			WHERE s.id = $1
+			  AND COALESCE(
+			         a.name,
+			         to_char(ts.name, 'YYYY-MM-DD HH24:MI:SS'),
+			         to_char(tm.name, 'HH24:MI'),
+			         to_char(d.name,  'YYYY-MM-DD'),
+			         n.name::text
+			      ) <> s.name
+			ORDER BY disp_name
 		`, p.Id)
 		if err != nil {
-			return fmt.Errorf("query tags: %w", err)
+			return fmt.Errorf("initializeIds(tagset): %w", err)
 		}
 		defer rows.Close()
 
 		for rows.Next() {
 			var tagID int
-			if err := rows.Scan(&tagID); err != nil {
-				return fmt.Errorf("scan tag id: %w", err)
+			var _disp string
+			if err := rows.Scan(&tagID, &_disp); err != nil {
+				return fmt.Errorf("initializeIds(tagset) scan: %w", err)
 			}
 			idList[tagID] = counter
 			counter++
 		}
-
-	case "node":
-		// Find this node's hierarchy
-		var hierarchyID int
-		if err := db.QueryRowContext(ctx,
-			`SELECT hierarchy_id FROM nodes WHERE id = $1`, p.Id,
-		).Scan(&hierarchyID); err != nil {
-			return fmt.Errorf("fetch hierarchy_id: %w", err)
+		if err := rows.Err(); err != nil {
+			return fmt.Errorf("initializeIds(tagset) rows: %w", err)
 		}
 
-		// Load child nodes one level down, ordered by their tag name
+	case "node":
+		// Keep your existing approach: list immediate children ordered by the node tag’s alphanumerical label.
+		var hierarchyID int
+		if err := db.QueryRowContext(ctx, `SELECT hierarchy_id FROM nodes WHERE id = $1`, p.Id).
+			Scan(&hierarchyID); err != nil {
+			return fmt.Errorf("initializeIds(node) fetch hierarchy_id: %w", err)
+		}
+
 		rows, err := db.QueryContext(ctx, `
 			SELECT n.id
 			FROM nodes n
@@ -65,21 +87,29 @@ func (p *ParsedAxis) InitializeIds(ctx context.Context, db *sql.DB) error {
 			ORDER BY a.name
 		`, p.Id, hierarchyID)
 		if err != nil {
-			return fmt.Errorf("query child nodes: %w", err)
+			return fmt.Errorf("initializeIds(node) query child nodes: %w", err)
 		}
 		defer rows.Close()
 
 		for rows.Next() {
 			var nodeID int
 			if err := rows.Scan(&nodeID); err != nil {
-				return fmt.Errorf("scan node id: %w", err)
+				return fmt.Errorf("initializeIds(node) scan: %w", err)
 			}
 			idList[nodeID] = counter
 			counter++
 		}
+		if err := rows.Err(); err != nil {
+			return fmt.Errorf("initializeIds(node) rows: %w", err)
+		}
 
 	default:
-		// Fallback: map 1→1
+		// Fallback: stable singleton
+		idList[1] = 1
+	}
+
+	// If nothing was found (empty tagset or node), still provide a stable default to avoid zero-length maps.
+	if len(idList) == 0 {
 		idList[1] = 1
 	}
 

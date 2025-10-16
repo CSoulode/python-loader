@@ -27,6 +27,7 @@ const (
 	DataLoader_DeleteMedia_FullMethodName         = "/dataloader.DataLoader/deleteMedia"
 	DataLoader_GetTagSets_FullMethodName          = "/dataloader.DataLoader/getTagSets"
 	DataLoader_GetTagSetById_FullMethodName       = "/dataloader.DataLoader/getTagSetById"
+	DataLoader_GetTagSetsById_FullMethodName      = "/dataloader.DataLoader/getTagSetsById"
 	DataLoader_GetTagSetByName_FullMethodName     = "/dataloader.DataLoader/getTagSetByName"
 	DataLoader_CreateTagSet_FullMethodName        = "/dataloader.DataLoader/createTagSet"
 	DataLoader_GetTags_FullMethodName             = "/dataloader.DataLoader/getTags"
@@ -50,6 +51,10 @@ const (
 	DataLoader_CreateNodeStream_FullMethodName    = "/dataloader.DataLoader/createNodeStream"
 	DataLoader_DeleteNode_FullMethodName          = "/dataloader.DataLoader/deleteNode"
 	DataLoader_GetCell_FullMethodName             = "/dataloader.DataLoader/getCell"
+	DataLoader_GetCellIncremental_FullMethodName  = "/dataloader.DataLoader/getCellIncremental"
+	DataLoader_GetCellIncremental2_FullMethodName = "/dataloader.DataLoader/getCellIncremental2"
+	DataLoader_GetCellIncremental3_FullMethodName = "/dataloader.DataLoader/getCellIncremental3"
+	DataLoader_GetCellIncremental4_FullMethodName = "/dataloader.DataLoader/getCellIncremental4"
 	DataLoader_ResetDatabase_FullMethodName       = "/dataloader.DataLoader/resetDatabase"
 )
 
@@ -69,6 +74,7 @@ type DataLoaderClient interface {
 	GetTagSets(ctx context.Context, in *GetTagSetsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamingTagSetResponse], error)
 	// Get all the tagsets stored in DB, with optional tagtype filter
 	GetTagSetById(ctx context.Context, in *IdRequest, opts ...grpc.CallOption) (*TagSet, error)
+	GetTagSetsById(ctx context.Context, in *IdRequest, opts ...grpc.CallOption) (*TagSetsResponse, error)
 	// Get a single tagset with the given ID
 	GetTagSetByName(ctx context.Context, in *GetTagSetRequestByName, opts ...grpc.CallOption) (*TagSet, error)
 	CreateTagSet(ctx context.Context, in *CreateTagSetRequest, opts ...grpc.CallOption) (*TagSet, error)
@@ -100,8 +106,11 @@ type DataLoaderClient interface {
 	CreateNode(ctx context.Context, in *CreateNodeRequest, opts ...grpc.CallOption) (*Node, error)
 	CreateNodeStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[CreateNodeRequest, StreamingNodeResponse], error)
 	DeleteNode(ctx context.Context, in *IdRequest, opts ...grpc.CallOption) (*Empty, error)
-	// -------------------------- Cell
 	GetCell(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellResponse], error)
+	GetCellIncremental(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellResponse], error)
+	GetCellIncremental2(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellChunk], error)
+	GetCellIncremental3(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellResponse], error)
+	GetCellIncremental4(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellResponse], error)
 	// Other
 	ResetDatabase(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 }
@@ -209,6 +218,16 @@ func (c *dataLoaderClient) GetTagSetById(ctx context.Context, in *IdRequest, opt
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(TagSet)
 	err := c.cc.Invoke(ctx, DataLoader_GetTagSetById_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dataLoaderClient) GetTagSetsById(ctx context.Context, in *IdRequest, opts ...grpc.CallOption) (*TagSetsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TagSetsResponse)
+	err := c.cc.Invoke(ctx, DataLoader_GetTagSetsById_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -508,6 +527,82 @@ func (c *dataLoaderClient) GetCell(ctx context.Context, in *GetCellRequest, opts
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type DataLoader_GetCellClient = grpc.ServerStreamingClient[CellResponse]
 
+func (c *dataLoaderClient) GetCellIncremental(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[12], DataLoader_GetCellIncremental_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[GetCellRequest, CellResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetCellIncrementalClient = grpc.ServerStreamingClient[CellResponse]
+
+func (c *dataLoaderClient) GetCellIncremental2(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellChunk], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[13], DataLoader_GetCellIncremental2_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[GetCellRequest, CellChunk]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetCellIncremental2Client = grpc.ServerStreamingClient[CellChunk]
+
+func (c *dataLoaderClient) GetCellIncremental3(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[14], DataLoader_GetCellIncremental3_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[GetCellRequest, CellResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetCellIncremental3Client = grpc.ServerStreamingClient[CellResponse]
+
+func (c *dataLoaderClient) GetCellIncremental4(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[15], DataLoader_GetCellIncremental4_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[GetCellRequest, CellResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetCellIncremental4Client = grpc.ServerStreamingClient[CellResponse]
+
 func (c *dataLoaderClient) ResetDatabase(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Empty)
@@ -534,6 +629,7 @@ type DataLoaderServer interface {
 	GetTagSets(*GetTagSetsRequest, grpc.ServerStreamingServer[StreamingTagSetResponse]) error
 	// Get all the tagsets stored in DB, with optional tagtype filter
 	GetTagSetById(context.Context, *IdRequest) (*TagSet, error)
+	GetTagSetsById(context.Context, *IdRequest) (*TagSetsResponse, error)
 	// Get a single tagset with the given ID
 	GetTagSetByName(context.Context, *GetTagSetRequestByName) (*TagSet, error)
 	CreateTagSet(context.Context, *CreateTagSetRequest) (*TagSet, error)
@@ -565,8 +661,11 @@ type DataLoaderServer interface {
 	CreateNode(context.Context, *CreateNodeRequest) (*Node, error)
 	CreateNodeStream(grpc.BidiStreamingServer[CreateNodeRequest, StreamingNodeResponse]) error
 	DeleteNode(context.Context, *IdRequest) (*Empty, error)
-	// -------------------------- Cell
 	GetCell(*GetCellRequest, grpc.ServerStreamingServer[CellResponse]) error
+	GetCellIncremental(*GetCellRequest, grpc.ServerStreamingServer[CellResponse]) error
+	GetCellIncremental2(*GetCellRequest, grpc.ServerStreamingServer[CellChunk]) error
+	GetCellIncremental3(*GetCellRequest, grpc.ServerStreamingServer[CellResponse]) error
+	GetCellIncremental4(*GetCellRequest, grpc.ServerStreamingServer[CellResponse]) error
 	// Other
 	ResetDatabase(context.Context, *Empty) (*Empty, error)
 	mustEmbedUnimplementedDataLoaderServer()
@@ -602,6 +701,9 @@ func (UnimplementedDataLoaderServer) GetTagSets(*GetTagSetsRequest, grpc.ServerS
 }
 func (UnimplementedDataLoaderServer) GetTagSetById(context.Context, *IdRequest) (*TagSet, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTagSetById not implemented")
+}
+func (UnimplementedDataLoaderServer) GetTagSetsById(context.Context, *IdRequest) (*TagSetsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTagSetsById not implemented")
 }
 func (UnimplementedDataLoaderServer) GetTagSetByName(context.Context, *GetTagSetRequestByName) (*TagSet, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTagSetByName not implemented")
@@ -671,6 +773,18 @@ func (UnimplementedDataLoaderServer) DeleteNode(context.Context, *IdRequest) (*E
 }
 func (UnimplementedDataLoaderServer) GetCell(*GetCellRequest, grpc.ServerStreamingServer[CellResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method GetCell not implemented")
+}
+func (UnimplementedDataLoaderServer) GetCellIncremental(*GetCellRequest, grpc.ServerStreamingServer[CellResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method GetCellIncremental not implemented")
+}
+func (UnimplementedDataLoaderServer) GetCellIncremental2(*GetCellRequest, grpc.ServerStreamingServer[CellChunk]) error {
+	return status.Errorf(codes.Unimplemented, "method GetCellIncremental2 not implemented")
+}
+func (UnimplementedDataLoaderServer) GetCellIncremental3(*GetCellRequest, grpc.ServerStreamingServer[CellResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method GetCellIncremental3 not implemented")
+}
+func (UnimplementedDataLoaderServer) GetCellIncremental4(*GetCellRequest, grpc.ServerStreamingServer[CellResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method GetCellIncremental4 not implemented")
 }
 func (UnimplementedDataLoaderServer) ResetDatabase(context.Context, *Empty) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ResetDatabase not implemented")
@@ -811,6 +925,24 @@ func _DataLoader_GetTagSetById_Handler(srv interface{}, ctx context.Context, dec
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DataLoaderServer).GetTagSetById(ctx, req.(*IdRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DataLoader_GetTagSetsById_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IdRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataLoaderServer).GetTagSetsById(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DataLoader_GetTagSetsById_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataLoaderServer).GetTagSetsById(ctx, req.(*IdRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1154,6 +1286,50 @@ func _DataLoader_GetCell_Handler(srv interface{}, stream grpc.ServerStream) erro
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type DataLoader_GetCellServer = grpc.ServerStreamingServer[CellResponse]
 
+func _DataLoader_GetCellIncremental_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetCellRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DataLoaderServer).GetCellIncremental(m, &grpc.GenericServerStream[GetCellRequest, CellResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetCellIncrementalServer = grpc.ServerStreamingServer[CellResponse]
+
+func _DataLoader_GetCellIncremental2_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetCellRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DataLoaderServer).GetCellIncremental2(m, &grpc.GenericServerStream[GetCellRequest, CellChunk]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetCellIncremental2Server = grpc.ServerStreamingServer[CellChunk]
+
+func _DataLoader_GetCellIncremental3_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetCellRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DataLoaderServer).GetCellIncremental3(m, &grpc.GenericServerStream[GetCellRequest, CellResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetCellIncremental3Server = grpc.ServerStreamingServer[CellResponse]
+
+func _DataLoader_GetCellIncremental4_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetCellRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DataLoaderServer).GetCellIncremental4(m, &grpc.GenericServerStream[GetCellRequest, CellResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetCellIncremental4Server = grpc.ServerStreamingServer[CellResponse]
+
 func _DataLoader_ResetDatabase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
@@ -1198,6 +1374,10 @@ var DataLoader_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "getTagSetById",
 			Handler:    _DataLoader_GetTagSetById_Handler,
+		},
+		{
+			MethodName: "getTagSetsById",
+			Handler:    _DataLoader_GetTagSetsById_Handler,
 		},
 		{
 			MethodName: "getTagSetByName",
@@ -1323,6 +1503,26 @@ var DataLoader_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "getCell",
 			Handler:       _DataLoader_GetCell_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "getCellIncremental",
+			Handler:       _DataLoader_GetCellIncremental_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "getCellIncremental2",
+			Handler:       _DataLoader_GetCellIncremental2_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "getCellIncremental3",
+			Handler:       _DataLoader_GetCellIncremental3_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "getCellIncremental4",
+			Handler:       _DataLoader_GetCellIncremental4_Handler,
 			ServerStreams: true,
 		},
 	},
