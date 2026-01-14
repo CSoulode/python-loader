@@ -19,43 +19,48 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	DataLoader_GetMedias_FullMethodName           = "/dataloader.DataLoader/getMedias"
-	DataLoader_GetMediaById_FullMethodName        = "/dataloader.DataLoader/getMediaById"
-	DataLoader_GetMediaByURI_FullMethodName       = "/dataloader.DataLoader/getMediaByURI"
-	DataLoader_CreateMedia_FullMethodName         = "/dataloader.DataLoader/createMedia"
-	DataLoader_CreateMediaStream_FullMethodName   = "/dataloader.DataLoader/createMediaStream"
-	DataLoader_DeleteMedia_FullMethodName         = "/dataloader.DataLoader/deleteMedia"
-	DataLoader_GetTagSets_FullMethodName          = "/dataloader.DataLoader/getTagSets"
-	DataLoader_GetTagSetById_FullMethodName       = "/dataloader.DataLoader/getTagSetById"
-	DataLoader_GetTagSetsById_FullMethodName      = "/dataloader.DataLoader/getTagSetsById"
-	DataLoader_GetTagSetByName_FullMethodName     = "/dataloader.DataLoader/getTagSetByName"
-	DataLoader_CreateTagSet_FullMethodName        = "/dataloader.DataLoader/createTagSet"
-	DataLoader_GetTags_FullMethodName             = "/dataloader.DataLoader/getTags"
-	DataLoader_GetTag_FullMethodName              = "/dataloader.DataLoader/getTag"
-	DataLoader_CreateTag_FullMethodName           = "/dataloader.DataLoader/createTag"
-	DataLoader_CreateTagStream_FullMethodName     = "/dataloader.DataLoader/createTagStream"
-	DataLoader_ChangeTagName_FullMethodName       = "/dataloader.DataLoader/changeTagName"
-	DataLoader_GetTaggings_FullMethodName         = "/dataloader.DataLoader/getTaggings"
-	DataLoader_GetMediasWithTag_FullMethodName    = "/dataloader.DataLoader/getMediasWithTag"
-	DataLoader_GetMediaTags_FullMethodName        = "/dataloader.DataLoader/getMediaTags"
-	DataLoader_CreateTagging_FullMethodName       = "/dataloader.DataLoader/createTagging"
-	DataLoader_CreateTaggingStream_FullMethodName = "/dataloader.DataLoader/createTaggingStream"
-	DataLoader_ChangeTagging_FullMethodName       = "/dataloader.DataLoader/changeTagging"
-	DataLoader_GetHierarchies_FullMethodName      = "/dataloader.DataLoader/getHierarchies"
-	DataLoader_GetHierarchy_FullMethodName        = "/dataloader.DataLoader/getHierarchy"
-	DataLoader_CreateHierarchy_FullMethodName     = "/dataloader.DataLoader/createHierarchy"
-	DataLoader_GetNodes_FullMethodName            = "/dataloader.DataLoader/getNodes"
-	DataLoader_GetNode_FullMethodName             = "/dataloader.DataLoader/getNode"
-	DataLoader_GetChildNodes_FullMethodName       = "/dataloader.DataLoader/getChildNodes"
-	DataLoader_CreateNode_FullMethodName          = "/dataloader.DataLoader/createNode"
-	DataLoader_CreateNodeStream_FullMethodName    = "/dataloader.DataLoader/createNodeStream"
-	DataLoader_DeleteNode_FullMethodName          = "/dataloader.DataLoader/deleteNode"
-	DataLoader_GetCell_FullMethodName             = "/dataloader.DataLoader/getCell"
-	DataLoader_GetCellIncremental_FullMethodName  = "/dataloader.DataLoader/getCellIncremental"
-	DataLoader_GetCellIncremental2_FullMethodName = "/dataloader.DataLoader/getCellIncremental2"
-	DataLoader_GetCellIncremental3_FullMethodName = "/dataloader.DataLoader/getCellIncremental3"
-	DataLoader_GetCellIncremental4_FullMethodName = "/dataloader.DataLoader/getCellIncremental4"
-	DataLoader_ResetDatabase_FullMethodName       = "/dataloader.DataLoader/resetDatabase"
+	DataLoader_GetMedias_FullMethodName                                              = "/dataloader.DataLoader/getMedias"
+	DataLoader_GetMediaById_FullMethodName                                           = "/dataloader.DataLoader/getMediaById"
+	DataLoader_GetMediaByURI_FullMethodName                                          = "/dataloader.DataLoader/getMediaByURI"
+	DataLoader_CreateMedia_FullMethodName                                            = "/dataloader.DataLoader/createMedia"
+	DataLoader_CreateMediaStream_FullMethodName                                      = "/dataloader.DataLoader/createMediaStream"
+	DataLoader_DeleteMedia_FullMethodName                                            = "/dataloader.DataLoader/deleteMedia"
+	DataLoader_GetTagSets_FullMethodName                                             = "/dataloader.DataLoader/getTagSets"
+	DataLoader_GetTagSetById_FullMethodName                                          = "/dataloader.DataLoader/getTagSetById"
+	DataLoader_GetTagSetsById_FullMethodName                                         = "/dataloader.DataLoader/getTagSetsById"
+	DataLoader_GetTagSetByName_FullMethodName                                        = "/dataloader.DataLoader/getTagSetByName"
+	DataLoader_CreateTagSet_FullMethodName                                           = "/dataloader.DataLoader/createTagSet"
+	DataLoader_GetTags_FullMethodName                                                = "/dataloader.DataLoader/getTags"
+	DataLoader_GetTag_FullMethodName                                                 = "/dataloader.DataLoader/getTag"
+	DataLoader_CreateTag_FullMethodName                                              = "/dataloader.DataLoader/createTag"
+	DataLoader_CreateTagStream_FullMethodName                                        = "/dataloader.DataLoader/createTagStream"
+	DataLoader_ChangeTagName_FullMethodName                                          = "/dataloader.DataLoader/changeTagName"
+	DataLoader_GetTaggings_FullMethodName                                            = "/dataloader.DataLoader/getTaggings"
+	DataLoader_GetMediasWithTag_FullMethodName                                       = "/dataloader.DataLoader/getMediasWithTag"
+	DataLoader_GetMediaTags_FullMethodName                                           = "/dataloader.DataLoader/getMediaTags"
+	DataLoader_CreateTagging_FullMethodName                                          = "/dataloader.DataLoader/createTagging"
+	DataLoader_CreateTaggingStream_FullMethodName                                    = "/dataloader.DataLoader/createTaggingStream"
+	DataLoader_ChangeTagging_FullMethodName                                          = "/dataloader.DataLoader/changeTagging"
+	DataLoader_GetHierarchies_FullMethodName                                         = "/dataloader.DataLoader/getHierarchies"
+	DataLoader_GetHierarchy_FullMethodName                                           = "/dataloader.DataLoader/getHierarchy"
+	DataLoader_CreateHierarchy_FullMethodName                                        = "/dataloader.DataLoader/createHierarchy"
+	DataLoader_GetNodes_FullMethodName                                               = "/dataloader.DataLoader/getNodes"
+	DataLoader_GetNode_FullMethodName                                                = "/dataloader.DataLoader/getNode"
+	DataLoader_GetChildNodes_FullMethodName                                          = "/dataloader.DataLoader/getChildNodes"
+	DataLoader_CreateNode_FullMethodName                                             = "/dataloader.DataLoader/createNode"
+	DataLoader_CreateNodeStream_FullMethodName                                       = "/dataloader.DataLoader/createNodeStream"
+	DataLoader_DeleteNode_FullMethodName                                             = "/dataloader.DataLoader/deleteNode"
+	DataLoader_GetCell_FullMethodName                                                = "/dataloader.DataLoader/getCell"
+	DataLoader_GetBrowsingState_FullMethodName                                       = "/dataloader.DataLoader/getBrowsingState"
+	DataLoader_GetBrowsingState2_FullMethodName                                      = "/dataloader.DataLoader/getBrowsingState2"
+	DataLoader_GetBrowsingStateIncrementally_FullMethodName                          = "/dataloader.DataLoader/getBrowsingStateIncrementally"
+	DataLoader_GetBrowsingStateByIdChunks_FullMethodName                             = "/dataloader.DataLoader/getBrowsingStateByIdChunks"
+	DataLoader_GetBrowsingStateNonDistinctBranchesChunks_FullMethodName              = "/dataloader.DataLoader/getBrowsingStateNonDistinctBranchesChunks"
+	DataLoader_GetBrowsingStateNonDistinctBranchesSingles_FullMethodName             = "/dataloader.DataLoader/getBrowsingStateNonDistinctBranchesSingles"
+	DataLoader_GetBrowsingStateDistinctBranchesFull_FullMethodName                   = "/dataloader.DataLoader/getBrowsingStateDistinctBranchesFull"
+	DataLoader_GetBrowsingStateDistinctBranchesChunks_FullMethodName                 = "/dataloader.DataLoader/getBrowsingStateDistinctBranchesChunks"
+	DataLoader_GetBrowsingStateNonDistinctBranchesDeduplicatedSingles_FullMethodName = "/dataloader.DataLoader/getBrowsingStateNonDistinctBranchesDeduplicatedSingles"
+	DataLoader_ResetDatabase_FullMethodName                                          = "/dataloader.DataLoader/resetDatabase"
 )
 
 // DataLoaderClient is the client API for DataLoader service.
@@ -106,11 +111,16 @@ type DataLoaderClient interface {
 	CreateNode(ctx context.Context, in *CreateNodeRequest, opts ...grpc.CallOption) (*Node, error)
 	CreateNodeStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[CreateNodeRequest, StreamingNodeResponse], error)
 	DeleteNode(ctx context.Context, in *IdRequest, opts ...grpc.CallOption) (*Empty, error)
-	GetCell(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellResponse], error)
-	GetCellIncremental(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellResponse], error)
-	GetCellIncremental2(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellChunk], error)
-	GetCellIncremental3(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellResponse], error)
-	GetCellIncremental4(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellResponse], error)
+	GetCell(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error)
+	GetBrowsingState(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error)
+	GetBrowsingState2(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error)
+	GetBrowsingStateIncrementally(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error)
+	GetBrowsingStateByIdChunks(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateChunk], error)
+	GetBrowsingStateNonDistinctBranchesChunks(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error)
+	GetBrowsingStateNonDistinctBranchesSingles(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error)
+	GetBrowsingStateDistinctBranchesFull(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error)
+	GetBrowsingStateDistinctBranchesChunks(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error)
+	GetBrowsingStateNonDistinctBranchesDeduplicatedSingles(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error)
 	// Other
 	ResetDatabase(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 }
@@ -508,13 +518,13 @@ func (c *dataLoaderClient) DeleteNode(ctx context.Context, in *IdRequest, opts .
 	return out, nil
 }
 
-func (c *dataLoaderClient) GetCell(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellResponse], error) {
+func (c *dataLoaderClient) GetCell(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[11], DataLoader_GetCell_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[GetCellRequest, CellResponse]{ClientStream: stream}
+	x := &grpc.GenericClientStream[GetCellRequest, BrowsingStateResponse]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -525,15 +535,15 @@ func (c *dataLoaderClient) GetCell(ctx context.Context, in *GetCellRequest, opts
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type DataLoader_GetCellClient = grpc.ServerStreamingClient[CellResponse]
+type DataLoader_GetCellClient = grpc.ServerStreamingClient[BrowsingStateResponse]
 
-func (c *dataLoaderClient) GetCellIncremental(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellResponse], error) {
+func (c *dataLoaderClient) GetBrowsingState(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[12], DataLoader_GetCellIncremental_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[12], DataLoader_GetBrowsingState_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[GetCellRequest, CellResponse]{ClientStream: stream}
+	x := &grpc.GenericClientStream[GetBrowsingStateRequest, BrowsingStateResponse]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -544,15 +554,15 @@ func (c *dataLoaderClient) GetCellIncremental(ctx context.Context, in *GetCellRe
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type DataLoader_GetCellIncrementalClient = grpc.ServerStreamingClient[CellResponse]
+type DataLoader_GetBrowsingStateClient = grpc.ServerStreamingClient[BrowsingStateResponse]
 
-func (c *dataLoaderClient) GetCellIncremental2(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellChunk], error) {
+func (c *dataLoaderClient) GetBrowsingState2(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[13], DataLoader_GetCellIncremental2_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[13], DataLoader_GetBrowsingState2_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[GetCellRequest, CellChunk]{ClientStream: stream}
+	x := &grpc.GenericClientStream[GetBrowsingStateRequest, BrowsingStateResponse]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -563,15 +573,15 @@ func (c *dataLoaderClient) GetCellIncremental2(ctx context.Context, in *GetCellR
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type DataLoader_GetCellIncremental2Client = grpc.ServerStreamingClient[CellChunk]
+type DataLoader_GetBrowsingState2Client = grpc.ServerStreamingClient[BrowsingStateResponse]
 
-func (c *dataLoaderClient) GetCellIncremental3(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellResponse], error) {
+func (c *dataLoaderClient) GetBrowsingStateIncrementally(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[14], DataLoader_GetCellIncremental3_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[14], DataLoader_GetBrowsingStateIncrementally_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[GetCellRequest, CellResponse]{ClientStream: stream}
+	x := &grpc.GenericClientStream[GetBrowsingStateRequest, BrowsingStateResponse]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -582,15 +592,15 @@ func (c *dataLoaderClient) GetCellIncremental3(ctx context.Context, in *GetCellR
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type DataLoader_GetCellIncremental3Client = grpc.ServerStreamingClient[CellResponse]
+type DataLoader_GetBrowsingStateIncrementallyClient = grpc.ServerStreamingClient[BrowsingStateResponse]
 
-func (c *dataLoaderClient) GetCellIncremental4(ctx context.Context, in *GetCellRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CellResponse], error) {
+func (c *dataLoaderClient) GetBrowsingStateByIdChunks(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateChunk], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[15], DataLoader_GetCellIncremental4_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[15], DataLoader_GetBrowsingStateByIdChunks_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[GetCellRequest, CellResponse]{ClientStream: stream}
+	x := &grpc.GenericClientStream[GetBrowsingStateRequest, BrowsingStateChunk]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -601,7 +611,102 @@ func (c *dataLoaderClient) GetCellIncremental4(ctx context.Context, in *GetCellR
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type DataLoader_GetCellIncremental4Client = grpc.ServerStreamingClient[CellResponse]
+type DataLoader_GetBrowsingStateByIdChunksClient = grpc.ServerStreamingClient[BrowsingStateChunk]
+
+func (c *dataLoaderClient) GetBrowsingStateNonDistinctBranchesChunks(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[16], DataLoader_GetBrowsingStateNonDistinctBranchesChunks_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[GetBrowsingStateRequest, BrowsingStateResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetBrowsingStateNonDistinctBranchesChunksClient = grpc.ServerStreamingClient[BrowsingStateResponse]
+
+func (c *dataLoaderClient) GetBrowsingStateNonDistinctBranchesSingles(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[17], DataLoader_GetBrowsingStateNonDistinctBranchesSingles_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[GetBrowsingStateRequest, BrowsingStateResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetBrowsingStateNonDistinctBranchesSinglesClient = grpc.ServerStreamingClient[BrowsingStateResponse]
+
+func (c *dataLoaderClient) GetBrowsingStateDistinctBranchesFull(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[18], DataLoader_GetBrowsingStateDistinctBranchesFull_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[GetBrowsingStateRequest, BrowsingStateResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetBrowsingStateDistinctBranchesFullClient = grpc.ServerStreamingClient[BrowsingStateResponse]
+
+func (c *dataLoaderClient) GetBrowsingStateDistinctBranchesChunks(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[19], DataLoader_GetBrowsingStateDistinctBranchesChunks_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[GetBrowsingStateRequest, BrowsingStateResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetBrowsingStateDistinctBranchesChunksClient = grpc.ServerStreamingClient[BrowsingStateResponse]
+
+func (c *dataLoaderClient) GetBrowsingStateNonDistinctBranchesDeduplicatedSingles(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[20], DataLoader_GetBrowsingStateNonDistinctBranchesDeduplicatedSingles_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[GetBrowsingStateRequest, BrowsingStateResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetBrowsingStateNonDistinctBranchesDeduplicatedSinglesClient = grpc.ServerStreamingClient[BrowsingStateResponse]
 
 func (c *dataLoaderClient) ResetDatabase(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -661,11 +766,16 @@ type DataLoaderServer interface {
 	CreateNode(context.Context, *CreateNodeRequest) (*Node, error)
 	CreateNodeStream(grpc.BidiStreamingServer[CreateNodeRequest, StreamingNodeResponse]) error
 	DeleteNode(context.Context, *IdRequest) (*Empty, error)
-	GetCell(*GetCellRequest, grpc.ServerStreamingServer[CellResponse]) error
-	GetCellIncremental(*GetCellRequest, grpc.ServerStreamingServer[CellResponse]) error
-	GetCellIncremental2(*GetCellRequest, grpc.ServerStreamingServer[CellChunk]) error
-	GetCellIncremental3(*GetCellRequest, grpc.ServerStreamingServer[CellResponse]) error
-	GetCellIncremental4(*GetCellRequest, grpc.ServerStreamingServer[CellResponse]) error
+	GetCell(*GetCellRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error
+	GetBrowsingState(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error
+	GetBrowsingState2(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error
+	GetBrowsingStateIncrementally(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error
+	GetBrowsingStateByIdChunks(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateChunk]) error
+	GetBrowsingStateNonDistinctBranchesChunks(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error
+	GetBrowsingStateNonDistinctBranchesSingles(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error
+	GetBrowsingStateDistinctBranchesFull(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error
+	GetBrowsingStateDistinctBranchesChunks(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error
+	GetBrowsingStateNonDistinctBranchesDeduplicatedSingles(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error
 	// Other
 	ResetDatabase(context.Context, *Empty) (*Empty, error)
 	mustEmbedUnimplementedDataLoaderServer()
@@ -771,20 +881,35 @@ func (UnimplementedDataLoaderServer) CreateNodeStream(grpc.BidiStreamingServer[C
 func (UnimplementedDataLoaderServer) DeleteNode(context.Context, *IdRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteNode not implemented")
 }
-func (UnimplementedDataLoaderServer) GetCell(*GetCellRequest, grpc.ServerStreamingServer[CellResponse]) error {
+func (UnimplementedDataLoaderServer) GetCell(*GetCellRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method GetCell not implemented")
 }
-func (UnimplementedDataLoaderServer) GetCellIncremental(*GetCellRequest, grpc.ServerStreamingServer[CellResponse]) error {
-	return status.Errorf(codes.Unimplemented, "method GetCellIncremental not implemented")
+func (UnimplementedDataLoaderServer) GetBrowsingState(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method GetBrowsingState not implemented")
 }
-func (UnimplementedDataLoaderServer) GetCellIncremental2(*GetCellRequest, grpc.ServerStreamingServer[CellChunk]) error {
-	return status.Errorf(codes.Unimplemented, "method GetCellIncremental2 not implemented")
+func (UnimplementedDataLoaderServer) GetBrowsingState2(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method GetBrowsingState2 not implemented")
 }
-func (UnimplementedDataLoaderServer) GetCellIncremental3(*GetCellRequest, grpc.ServerStreamingServer[CellResponse]) error {
-	return status.Errorf(codes.Unimplemented, "method GetCellIncremental3 not implemented")
+func (UnimplementedDataLoaderServer) GetBrowsingStateIncrementally(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method GetBrowsingStateIncrementally not implemented")
 }
-func (UnimplementedDataLoaderServer) GetCellIncremental4(*GetCellRequest, grpc.ServerStreamingServer[CellResponse]) error {
-	return status.Errorf(codes.Unimplemented, "method GetCellIncremental4 not implemented")
+func (UnimplementedDataLoaderServer) GetBrowsingStateByIdChunks(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateChunk]) error {
+	return status.Errorf(codes.Unimplemented, "method GetBrowsingStateByIdChunks not implemented")
+}
+func (UnimplementedDataLoaderServer) GetBrowsingStateNonDistinctBranchesChunks(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method GetBrowsingStateNonDistinctBranchesChunks not implemented")
+}
+func (UnimplementedDataLoaderServer) GetBrowsingStateNonDistinctBranchesSingles(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method GetBrowsingStateNonDistinctBranchesSingles not implemented")
+}
+func (UnimplementedDataLoaderServer) GetBrowsingStateDistinctBranchesFull(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method GetBrowsingStateDistinctBranchesFull not implemented")
+}
+func (UnimplementedDataLoaderServer) GetBrowsingStateDistinctBranchesChunks(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method GetBrowsingStateDistinctBranchesChunks not implemented")
+}
+func (UnimplementedDataLoaderServer) GetBrowsingStateNonDistinctBranchesDeduplicatedSingles(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method GetBrowsingStateNonDistinctBranchesDeduplicatedSingles not implemented")
 }
 func (UnimplementedDataLoaderServer) ResetDatabase(context.Context, *Empty) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ResetDatabase not implemented")
@@ -1280,55 +1405,110 @@ func _DataLoader_GetCell_Handler(srv interface{}, stream grpc.ServerStream) erro
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(DataLoaderServer).GetCell(m, &grpc.GenericServerStream[GetCellRequest, CellResponse]{ServerStream: stream})
+	return srv.(DataLoaderServer).GetCell(m, &grpc.GenericServerStream[GetCellRequest, BrowsingStateResponse]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type DataLoader_GetCellServer = grpc.ServerStreamingServer[CellResponse]
+type DataLoader_GetCellServer = grpc.ServerStreamingServer[BrowsingStateResponse]
 
-func _DataLoader_GetCellIncremental_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(GetCellRequest)
+func _DataLoader_GetBrowsingState_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetBrowsingStateRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(DataLoaderServer).GetCellIncremental(m, &grpc.GenericServerStream[GetCellRequest, CellResponse]{ServerStream: stream})
+	return srv.(DataLoaderServer).GetBrowsingState(m, &grpc.GenericServerStream[GetBrowsingStateRequest, BrowsingStateResponse]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type DataLoader_GetCellIncrementalServer = grpc.ServerStreamingServer[CellResponse]
+type DataLoader_GetBrowsingStateServer = grpc.ServerStreamingServer[BrowsingStateResponse]
 
-func _DataLoader_GetCellIncremental2_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(GetCellRequest)
+func _DataLoader_GetBrowsingState2_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetBrowsingStateRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(DataLoaderServer).GetCellIncremental2(m, &grpc.GenericServerStream[GetCellRequest, CellChunk]{ServerStream: stream})
+	return srv.(DataLoaderServer).GetBrowsingState2(m, &grpc.GenericServerStream[GetBrowsingStateRequest, BrowsingStateResponse]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type DataLoader_GetCellIncremental2Server = grpc.ServerStreamingServer[CellChunk]
+type DataLoader_GetBrowsingState2Server = grpc.ServerStreamingServer[BrowsingStateResponse]
 
-func _DataLoader_GetCellIncremental3_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(GetCellRequest)
+func _DataLoader_GetBrowsingStateIncrementally_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetBrowsingStateRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(DataLoaderServer).GetCellIncremental3(m, &grpc.GenericServerStream[GetCellRequest, CellResponse]{ServerStream: stream})
+	return srv.(DataLoaderServer).GetBrowsingStateIncrementally(m, &grpc.GenericServerStream[GetBrowsingStateRequest, BrowsingStateResponse]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type DataLoader_GetCellIncremental3Server = grpc.ServerStreamingServer[CellResponse]
+type DataLoader_GetBrowsingStateIncrementallyServer = grpc.ServerStreamingServer[BrowsingStateResponse]
 
-func _DataLoader_GetCellIncremental4_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(GetCellRequest)
+func _DataLoader_GetBrowsingStateByIdChunks_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetBrowsingStateRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(DataLoaderServer).GetCellIncremental4(m, &grpc.GenericServerStream[GetCellRequest, CellResponse]{ServerStream: stream})
+	return srv.(DataLoaderServer).GetBrowsingStateByIdChunks(m, &grpc.GenericServerStream[GetBrowsingStateRequest, BrowsingStateChunk]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type DataLoader_GetCellIncremental4Server = grpc.ServerStreamingServer[CellResponse]
+type DataLoader_GetBrowsingStateByIdChunksServer = grpc.ServerStreamingServer[BrowsingStateChunk]
+
+func _DataLoader_GetBrowsingStateNonDistinctBranchesChunks_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetBrowsingStateRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DataLoaderServer).GetBrowsingStateNonDistinctBranchesChunks(m, &grpc.GenericServerStream[GetBrowsingStateRequest, BrowsingStateResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetBrowsingStateNonDistinctBranchesChunksServer = grpc.ServerStreamingServer[BrowsingStateResponse]
+
+func _DataLoader_GetBrowsingStateNonDistinctBranchesSingles_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetBrowsingStateRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DataLoaderServer).GetBrowsingStateNonDistinctBranchesSingles(m, &grpc.GenericServerStream[GetBrowsingStateRequest, BrowsingStateResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetBrowsingStateNonDistinctBranchesSinglesServer = grpc.ServerStreamingServer[BrowsingStateResponse]
+
+func _DataLoader_GetBrowsingStateDistinctBranchesFull_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetBrowsingStateRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DataLoaderServer).GetBrowsingStateDistinctBranchesFull(m, &grpc.GenericServerStream[GetBrowsingStateRequest, BrowsingStateResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetBrowsingStateDistinctBranchesFullServer = grpc.ServerStreamingServer[BrowsingStateResponse]
+
+func _DataLoader_GetBrowsingStateDistinctBranchesChunks_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetBrowsingStateRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DataLoaderServer).GetBrowsingStateDistinctBranchesChunks(m, &grpc.GenericServerStream[GetBrowsingStateRequest, BrowsingStateResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetBrowsingStateDistinctBranchesChunksServer = grpc.ServerStreamingServer[BrowsingStateResponse]
+
+func _DataLoader_GetBrowsingStateNonDistinctBranchesDeduplicatedSingles_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetBrowsingStateRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DataLoaderServer).GetBrowsingStateNonDistinctBranchesDeduplicatedSingles(m, &grpc.GenericServerStream[GetBrowsingStateRequest, BrowsingStateResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetBrowsingStateNonDistinctBranchesDeduplicatedSinglesServer = grpc.ServerStreamingServer[BrowsingStateResponse]
 
 func _DataLoader_ResetDatabase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
@@ -1506,23 +1686,48 @@ var DataLoader_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 		{
-			StreamName:    "getCellIncremental",
-			Handler:       _DataLoader_GetCellIncremental_Handler,
+			StreamName:    "getBrowsingState",
+			Handler:       _DataLoader_GetBrowsingState_Handler,
 			ServerStreams: true,
 		},
 		{
-			StreamName:    "getCellIncremental2",
-			Handler:       _DataLoader_GetCellIncremental2_Handler,
+			StreamName:    "getBrowsingState2",
+			Handler:       _DataLoader_GetBrowsingState2_Handler,
 			ServerStreams: true,
 		},
 		{
-			StreamName:    "getCellIncremental3",
-			Handler:       _DataLoader_GetCellIncremental3_Handler,
+			StreamName:    "getBrowsingStateIncrementally",
+			Handler:       _DataLoader_GetBrowsingStateIncrementally_Handler,
 			ServerStreams: true,
 		},
 		{
-			StreamName:    "getCellIncremental4",
-			Handler:       _DataLoader_GetCellIncremental4_Handler,
+			StreamName:    "getBrowsingStateByIdChunks",
+			Handler:       _DataLoader_GetBrowsingStateByIdChunks_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "getBrowsingStateNonDistinctBranchesChunks",
+			Handler:       _DataLoader_GetBrowsingStateNonDistinctBranchesChunks_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "getBrowsingStateNonDistinctBranchesSingles",
+			Handler:       _DataLoader_GetBrowsingStateNonDistinctBranchesSingles_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "getBrowsingStateDistinctBranchesFull",
+			Handler:       _DataLoader_GetBrowsingStateDistinctBranchesFull_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "getBrowsingStateDistinctBranchesChunks",
+			Handler:       _DataLoader_GetBrowsingStateDistinctBranchesChunks_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "getBrowsingStateNonDistinctBranchesDeduplicatedSingles",
+			Handler:       _DataLoader_GetBrowsingStateNonDistinctBranchesDeduplicatedSingles_Handler,
 			ServerStreams: true,
 		},
 	},

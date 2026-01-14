@@ -25,3 +25,36 @@ func MustGetEnvInt(key string) int {
 	}
 	return v
 }
+
+func ConditionalAssignInt(condition bool, optionTrue int, optionFalse int) int {
+	if condition {
+		return optionTrue
+	}
+	return optionFalse
+}
+func ConditionalAssignString(condition bool, optionTrue string, optionFalse string) string {
+	if condition {
+		return optionTrue
+	}
+	return optionFalse
+}
+
+func TryFind[T any](arr []T, predicate func(T) bool) (T, bool) {
+	var zero T
+	for _, v := range arr {
+		if predicate(v) {
+			return v, true
+		}
+	}
+	return zero, false
+}
+
+func Where[T any](arr []T, predicate func(T) bool) []T {
+	var result []T
+	for _, v := range arr {
+		if predicate(v) {
+			result = append(result, v)
+		}
+	}
+	return result
+}

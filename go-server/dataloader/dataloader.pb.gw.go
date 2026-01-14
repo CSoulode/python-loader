@@ -292,7 +292,7 @@ func RegisterDataLoaderHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/dataloader.DataLoader/GetCell", runtime.WithHTTPPathPattern("/api/cell"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/dataloader.DataLoader/GetCell", runtime.WithHTTPPathPattern("/api/getCell"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -312,7 +312,7 @@ var (
 	pattern_DataLoader_GetTagSets_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"api", "tagset"}, ""))
 	pattern_DataLoader_GetTagSetsById_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 2}, []string{"api", "tagset", "id"}, ""))
 	pattern_DataLoader_GetChildNodes_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 2, 2, 3}, []string{"api", "node", "id", "children"}, ""))
-	pattern_DataLoader_GetCell_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"api", "cell"}, ""))
+	pattern_DataLoader_GetCell_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"api", "getCell"}, ""))
 )
 
 var (

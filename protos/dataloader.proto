@@ -78,17 +78,22 @@ service DataLoader {
   // The 'all' parameter can be set to "true" to get all the cells in the datacube
   // The 'timeline' parameter can be set to "true" to get the timeline of the cell
 
-  rpc getCell (GetCellRequest) returns (stream CellResponse) {
+  rpc getCell (GetCellRequest) returns (stream BrowsingStateResponse) {
     option (google.api.http) = {
-      get: "/api/cell"
+      get: "/api/getCell"  // Maintain old endpoint for compatibility
     };
   };
 
-  rpc getCellIncremental (GetCellRequest) returns (stream CellResponse) {};  
-  rpc getCellIncremental2 (GetCellRequest) returns (stream CellChunk) {};  
-  rpc getCellIncremental3 (GetCellRequest) returns (stream CellResponse) {}; 
-  rpc getCellIncremental4 (GetCellRequest) returns (stream CellResponse) {};  
- 
+  rpc getBrowsingState (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};                                         // Previously getCell
+  rpc getBrowsingState2 (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};                                        // getBrowsing state with idenpendent stream.send thread
+  rpc getBrowsingStateIncrementally (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};                            // Previously getCellIncrementally
+  rpc getBrowsingStateByIdChunks (GetBrowsingStateRequest) returns (stream BrowsingStateChunk) {};                                  // Previously getCellIncrementally2
+  rpc getBrowsingStateNonDistinctBranchesChunks (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};                // Previously getCellIncrementally3
+  rpc getBrowsingStateNonDistinctBranchesSingles (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};               // Previously getCellIncrementally4
+  rpc getBrowsingStateDistinctBranchesFull (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};                     // Previously getCellIncrementally5
+  rpc getBrowsingStateDistinctBranchesChunks (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};                   // Previously getCellIncrementally6
+  rpc getBrowsingStateNonDistinctBranchesDeduplicatedSingles (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};  
+
   // Other
 	rpc resetDatabase (Empty) returns (Empty) {};
     // Reads and executes the DDL, which does 2 things: drop the schemas, and recreate all the tables and rules
@@ -377,7 +382,7 @@ message ChildNodeResponse {
 }
 
 // Cell
-message GetCellRequest {
+message GetCellRequest { //DEPRICATED for http backwards compatibility only
   string xAxis = 1;
   string yAxis = 2;
   string zAxis = 3;
@@ -386,7 +391,38 @@ message GetCellRequest {
   string timeline = 6;
 }
 
-message CellResponse {
+message GetBrowsingStateRequest {
+  repeated AxisFilter filters = 1;
+  string all = 2;
+  string timeline = 3;
+}
+
+enum FilterValueType {
+  UNDEFINED = 0;
+  TAG = 1;
+  TAGSET = 2;
+  NODE = 3;
+  NUMRANGE = 4;
+  ALPHARANGE = 5;
+  DATERANGE = 6;
+  TIMERANGE = 7;
+  TIMESTAMPRANGE = 8;
+}
+
+enum AxisType {
+  X_AXIS = 0;
+  Y_AXIS = 1;
+  Z_AXIS = 2;
+  FILTER = 3;
+}
+
+message AxisFilter {
+  AxisType axisFilterType = 1;
+  int32 value = 2;
+  FilterValueType valueType = 3;
+}
+
+message BrowsingStateResponse {
   int32 x = 1;
   int32 y = 2;
   int32 z = 3;
@@ -394,9 +430,9 @@ message CellResponse {
   repeated CubeObject cubeObjects = 5;
 }
 
-message CellChunk {
+message BrowsingStateChunk {
   bool authoritative = 1;
-  repeated CellResponse cells = 2;
+  repeated BrowsingStateResponse cells = 2;
 }
 
 message CubeObject {

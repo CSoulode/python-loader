@@ -22,9 +22,8 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	_ "github.com/lib/pq"
 
-	pb "m3.dataloader/dataloader"
-
 	amqp "github.com/rabbitmq/amqp091-go"
+	pb "m3.dataloader/dataloader"
 	rmq "m3.dataloader/rabbitMQ"
 	gutils "m3.dataloader/utilities"
 )
@@ -50,8 +49,8 @@ type DataLoaderServer struct {
 	db *sql.DB
 }
 
-func NewDataLoaderServer(connStr string) (*DataLoaderServer, error) {
-	db, err := sql.Open("postgres", connStr)
+func NewDataLoaderServer(dbConnStr string) (*DataLoaderServer, error) {
+	db, err := sql.Open("postgres", dbConnStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to the database: %w", err)
 	}
@@ -433,7 +432,7 @@ func main() {
 	// Custom handlers for specific endpoints
 	httpMux.HandleFunc("/api/tagset", GetTagsetsHandler(client))
 	httpMux.HandleFunc("/api/node/{parentId}/children", GetChildNodesHandler(client))
-	httpMux.HandleFunc("/api/cell", GetCellHandler(client))
+	httpMux.HandleFunc("/api/getCell", GetBrowsingStateHandler(client))
 
 	// 5) Fallback to the generated gateway for everything else
 	httpMux.Handle("/", gwMux)
