@@ -86,12 +86,10 @@ service DataLoader {
 
   rpc getBrowsingState (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};                                         // Previously getCell
   rpc getBrowsingState2 (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};                                        // getBrowsing state with idenpendent stream.send thread
-  rpc getBrowsingStateIncrementally (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};                            // Previously getCellIncrementally
-  rpc getBrowsingStateByIdChunks (GetBrowsingStateRequest) returns (stream BrowsingStateChunk) {};                                  // Previously getCellIncrementally2
-  rpc getBrowsingStateNonDistinctBranchesChunks (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};                // Previously getCellIncrementally3
+  rpc getBrowsingStateNonDistinctBranchesIncrementalGrouping (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};                // Previously getCellIncrementally3
   rpc getBrowsingStateNonDistinctBranchesSingles (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};               // Previously getCellIncrementally4
   rpc getBrowsingStateDistinctBranchesFull (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};                     // Previously getCellIncrementally5
-  rpc getBrowsingStateDistinctBranchesChunks (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};                   // Previously getCellIncrementally6
+  rpc getBrowsingStateDistinctBranchesIncrementalGrouping (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};                   // Previously getCellIncrementally6
   rpc getBrowsingStateNonDistinctBranchesDeduplicatedSingles (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};  
 
   // Other

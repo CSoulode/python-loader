@@ -39,6 +39,13 @@ func ConditionalAssignString(condition bool, optionTrue string, optionFalse stri
 	return optionFalse
 }
 
+func TernaryStr(cond bool, a, b string) string {
+	if cond {
+		return a
+	}
+	return b
+}
+
 func TryFind[T any](arr []T, predicate func(T) bool) (T, bool) {
 	var zero T
 	for _, v := range arr {
