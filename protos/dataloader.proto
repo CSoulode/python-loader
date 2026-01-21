@@ -91,6 +91,7 @@ service DataLoader {
   rpc getBrowsingStateDistinctBranchesFull (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};                     // Previously getCellIncrementally5
   rpc getBrowsingStateDistinctBranchesIncrementalGrouping (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};                   // Previously getCellIncrementally6
   rpc getBrowsingStateNonDistinctBranchesDeduplicatedSingles (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};  
+  rpc getBrowsingStateNonDistinctBranchesFull (GetBrowsingStateRequest) returns (stream BrowsingStateResponse) {};                // Previously getCellIncrementally3
 
   // Other
 	rpc resetDatabase (Empty) returns (Empty) {};

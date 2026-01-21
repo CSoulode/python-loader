@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/lib/pq"
@@ -31,9 +32,9 @@ const (
 	batchSize         = 10240                  // send once we have this many rows
 	flushInterval     = 50 * time.Millisecond  // or at least this often
 	maxFirstFlush     = 150 * time.Millisecond // ensure first batch <~ 150ms
-	defaultCellMapCap = 2048
-	defaultDirtyCap   = 512
-	dirtyChanCap      = 4096
+	defaultCellMapCap = 65536
+	defaultDirtyCap   = 65536
+	dirtyChanCap      = 65536
 	defAxisPos        = 1
 	unsetAxisId       = -1
 	sqlTraceMaxLtr    = 128
@@ -47,27 +48,6 @@ type rowCell struct {
 	FileUri      string
 	ThumbnailUri string
 	Count        int32
-}
-
-type cellKey struct{ x, y, z int32 }
-
-type cellAgg struct {
-	count    int32
-	repID    int32
-	fileURI  string
-	thumbURI string
-	seen     map[int32]struct{} // DISTINCT object_id per cell
-	rev      uint64             // increments whenever cell state changes, added to ensure no messages are dropped
-}
-
-// Struct to hold a snapshot of cell values under RLock so we don't hold locks during network I/O.
-type snap struct {
-	k        cellKey
-	count    int32
-	repID    int32
-	fileURI  string
-	thumbURI string
-	rev      uint64
 }
 
 // ---- SQL tracing (file-backed) ---------------------------------------------
@@ -519,10 +499,14 @@ func ExecuteInitializeIdsPlan(ctx context.Context, db *sql.DB, plan *qg.Initiali
 }
 
 // GetBrowsingStateDistinctBranchesChunks:
-// - Uses the ungrouped (no GROUP BY) SQL with DISTINCT branches like Incremental5.
+// - Uses the ungrouped (no GROUP BY) SQL with DISTINCT branches.
 // - Aggregates per-cell in Go with DISTINCT(object_id) and MAX(object_id) as representative.
-// - Streams authoritative updates periodically while scanning, like Incremental3.
-func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesIncrementalGrouping(req *pb.GetBrowsingStateRequest, stream pb.DataLoader_GetBrowsingStateDistinctBranchesIncrementalGroupingServer) error {
+// - Streams authoritative updates periodically while scanning (stream.Send happens in a dedicated goroutine).
+// - Uses transaction scope and optional SET LOCAL enable_hashjoin=off.
+func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesIncrementalGrouping(
+	req *pb.GetBrowsingStateRequest,
+	stream pb.DataLoader_GetBrowsingStateDistinctBranchesIncrementalGroupingServer,
+) error {
 	ctx := stream.Context()
 
 	// ---------- Parse request params ----------
@@ -535,7 +519,7 @@ func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesIncrementalGrouping(r
 	}
 
 	// ---------- Axis positions (needed to map ids -> positions) ----------
-	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "DistinctBranchesChunks(initAxes).exec"); err != nil {
+	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "DistinctBranchesIncrementalGrouping(initAxes).exec"); err != nil {
 		return err
 	}
 
@@ -551,65 +535,77 @@ func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesIncrementalGrouping(r
 	if sqlStr == "" {
 		sqlStr = `select 1 as x_id, 1 as y_id, 1 as z_id, O.id as object_id, O.file_uri, O.thumbnail_uri from medias O;`
 	}
-	traceSQL("DistinctBranchesChunks.ungrouped-distinct", formatSQLForLog("\n"+sqlStr, nil, sqlTraceMaxLtr))
+	traceSQL("DistinctBranchesIncrementalGrouping.ungrouped-distinct", formatSQLForLog("\n"+sqlStr, nil, sqlTraceMaxLtr))
 
-	rows, err := s.db.QueryContext(ctx, sqlStr)
+	// ---------- Instrumentation Init ----------
+	m := NewStreamMetrics("DistinctBranchesIncrementalGrouping")
+
+	// ---------- TX scope (ReadOnly + optional SET LOCAL) ----------
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
-		return fmt.Errorf("getBrowsingStateDistinctBranchesChunks ungrouped: %w", err)
+		return fmt.Errorf("GetBrowsingStateDistinctBranchesIncrementalGrouping begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if disableHashJoins {
+		if _, err := tx.ExecContext(ctx, "SET LOCAL enable_hashjoin = off"); err != nil {
+			return fmt.Errorf("GetBrowsingStateDistinctBranchesIncrementalGrouping set enable_hashjoin=off: %w", err)
+		}
+	}
+
+	rows, err := tx.QueryContext(ctx, sqlStr)
+	if err != nil {
+		return fmt.Errorf("GetBrowsingStateDistinctBranchesIncrementalGrouping ungrouped: %w", err)
 	}
 	defer rows.Close()
 
-	cells := make(map[cellKey]*cellAgg, defaultCellMapCap)
-	dirty := make(map[cellKey]struct{}, defaultDirtyCap)
+	// Keep large buffers (match your previous hot-path behavior unless you tune later)
+	dirtyCh := make(chan cellKey, 65536)
 
-	flushTicker := time.NewTicker(flushInterval)
-	defer flushTicker.Stop()
+	agg := NewCellAggregator(CellAggregatorOpts{
+		InitialCap: 65536,
+		SeenCap:    16,
+	})
 
-	flush := func(force bool) error {
-		if !force && len(dirty) == 0 {
-			return nil
-		}
-		sent := 0
-		for k := range dirty {
-			agg := cells[k]
-			resp := &pb.BrowsingStateResponse{
-				X:     k.x,
-				Y:     k.y,
-				Z:     k.z,
-				Count: agg.count,
-				CubeObjects: []*pb.CubeObject{{
-					Id:           agg.repID,
-					FileUri:      agg.fileURI,
-					ThumbnailUri: agg.thumbURI,
-				}},
-			}
-			// Early abort on client cancellation
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-			}
-			if err := stream.Send(resp); err != nil {
-				return err
-			}
-			delete(dirty, k)
-			sent++
-			if !force && sent >= streamBatchSize {
-				break
-			}
-		}
-		return nil
-	}
+	// Dedicated sender goroutine: owns stream.Send + periodic flush semantics.
+	// Metrics:
+	// - consumes dirty keys => queue depth decreases
+	// - sends responses => first send + sent counter
+	sendErrCh := make(chan error, 1)
+	go func() {
+		sendErrCh <- RunKeyFlusherWithMetrics(
+			ctx,
+			stream,
+			dirtyCh,
+			agg,
+			flushInterval,
+			streamBatchSize,
+			65536, // pendingCap
+			func(sn snap) *pb.BrowsingStateResponse {
+				return &pb.BrowsingStateResponse{
+					X:     sn.k.x,
+					Y:     sn.k.y,
+					Z:     sn.k.z,
+					Count: sn.count,
+					CubeObjects: []*pb.CubeObject{{
+						Id:           sn.repID,
+						FileUri:      sn.fileURI,
+						ThumbnailUri: sn.thumbURI,
+					}},
+				}
+			},
+			m,
+		)
+	}()
 
 scanLoop:
 	for {
 		select {
 		case <-ctx.Done():
+			close(dirtyCh)
+			_ = <-sendErrCh
+			m.LogSummary("ctx_cancelled=true")
 			return ctx.Err()
-		case <-flushTicker.C:
-			if err := flush(false); err != nil {
-				return err
-			}
 		default:
 		}
 
@@ -619,107 +615,15 @@ scanLoop:
 
 		var r rowCell
 		if err := rows.Scan(&r.X, &r.Y, &r.Z, &r.Id, &r.FileUri, &r.ThumbnailUri); err != nil {
-			return fmt.Errorf("getBrowsingStateDistinctBranchesChunks scan: %w", err)
+			close(dirtyCh)
+			_ = <-sendErrCh
+			m.LogSummary("scan_error=true")
+			return fmt.Errorf("GetBrowsingStateDistinctBranchesIncrementalGrouping scan: %w", err)
 		}
 
-		// Map DB IDs -> cube positions (default 1 when axis empty)
-		px := axisX.Ids[r.X]
-		if px == 0 {
-			px = 1
-		}
-		py := axisY.Ids[r.Y]
-		if py == 0 {
-			py = 1
-		}
-		pz := axisZ.Ids[r.Z]
-		if pz == 0 {
-			pz = 1
-		}
-		key := cellKey{int32(px), int32(py), int32(pz)}
-
-		agg := cells[key]
-		if agg == nil {
-			agg = &cellAgg{seen: make(map[int32]struct{}, 16)}
-			cells[key] = agg
-		}
-
-		// DISTINCT object per cell (as in Incr5)
-		// Note: DISTINCT already applied per-branch in SQL, but retain guard in case of
-		// cross-branch duplication reaching same (x,y,z) after position mapping.
-		if _, ok := agg.seen[r.Id]; !ok {
-			agg.seen[r.Id] = struct{}{}
-			agg.count++
-		}
-
-		// Representative = MAX(object_id) (as in Incr5)
-		if r.Id > agg.repID {
-			agg.repID = r.Id
-			agg.fileURI = r.FileUri
-			agg.thumbURI = r.ThumbnailUri
-		}
-
-		dirty[key] = struct{}{}
-	}
-
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("getBrowsingStateDistinctBranchesChunks rows: %w", err)
-	}
-
-	// Final flush to emit any remaining dirty cells
-	return flush(true)
-}
-
-// GetBrowsingStateDistinctBranchesFull: Same logical result as baseline getCell (STATE path),
-// but executes an ungrouped join (no GROUP BY) with DISTINCT in branches,
-// and performs grouping entirely in memory in Go. It sends responses only
-// after grouping completes (authoritative).
-func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesFull(req *pb.GetBrowsingStateRequest, stream pb.DataLoader_GetBrowsingStateDistinctBranchesFullServer) error {
-	ctx := stream.Context()
-
-	// ---------- Parse request params ----------
-	axisOrder, axisX, axisY, axisZ, filters, err := parseAxesAndFilters(req)
-
-	if axisOrder == nil {
-		return fmt.Errorf("invalid axis filter order")
-	}
-	if err != nil {
-		return err
-	}
-
-	// ---------- Axis positions ----------
-	if err := initXYZAxes(stream.Context(), s.db, &axisX, &axisY, &axisZ, "DistinctBranchesFull(initAxes).exec"); err != nil {
-		return err
-	}
-
-	// ---------- State semantics via in-memory grouping ----------
-	// Build the ungrouped SQL (NO GROUP BY), but DISTINCT per-branch enabled.
-	sqlStr := qg.GenerateUngroupedSQLForState(
-		axisOrder,
-		axisX.Type, axisX.Id,
-		axisY.Type, axisY.Id,
-		axisZ.Type, axisZ.Id,
-		filters,
-		qg.UngroupedOpts{BranchDistinct: true},
-	)
-	if sqlStr == "" {
-		sqlStr = `select 1 as x_id, 1 as y_id, 1 as z_id, O.id as object_id, O.file_uri, O.thumbnail_uri from medias O;`
-	}
-	traceSQL("DistinctBranchesFull(ungrouped, distinct-branches).exec", formatSQLForLog("\n"+sqlStr, nil, sqlTraceMaxLtr))
-
-	rows, err := s.db.QueryContext(ctx, sqlStr)
-	if err != nil {
-		return fmt.Errorf("getBrowsingStateDistinctBranchesFull ungrouped: %w", err)
-	}
-	defer rows.Close()
-
-	cells := make(map[cellKey]*cellAgg, defaultCellMapCap)
-
-	// Scan all rows (no streaming yet — emit only final results)
-	for rows.Next() {
-		var r rowCell
-		if err := rows.Scan(&r.X, &r.Y, &r.Z, &r.Id, &r.FileUri, &r.ThumbnailUri); err != nil {
-			return fmt.Errorf("getBrowsingStateDistinctBranchesFull scan: %w", err)
-		}
+		// successfully scanned a row
+		atomic.AddInt64(&m.RowsRead, 1)
+		m.MarkFirstRow()
 
 		// Map DB IDs -> cube positions (default 1 when axis empty)
 		px := axisX.Ids[r.X]
@@ -736,30 +640,224 @@ func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesFull(req *pb.GetBrows
 		}
 		key := cellKey{int32(px), int32(py), int32(pz)}
 
-		agg := cells[key]
-		if agg == nil {
-			agg = &cellAgg{seen: make(map[int32]struct{}, 8)}
-			cells[key] = agg
-		}
+		_, shouldEnqueue := agg.ApplyRow(key, r.Id, r.FileUri, r.ThumbnailUri, 16)
 
-		// DISTINCT object count per cell
-		if _, ok := agg.seen[r.Id]; !ok {
-			agg.seen[r.Id] = struct{}{}
-			agg.count++
-		}
-		// Representative = MAX(object_id)
-		if r.Id > agg.repID {
-			agg.repID = r.Id
-			agg.fileURI = r.FileUri
-			agg.thumbURI = r.ThumbnailUri
+		if shouldEnqueue {
+			// We only count produced items when the enqueue actually succeeds.
+			// Track dirty-key queue depth as the backpressure signal for this mode.
+			m.IncQueue(+1)
+
+			select {
+			case dirtyCh <- key:
+				atomic.AddInt64(&m.ItemsProduced, 1)
+			case <-ctx.Done():
+				// undo queue increment because enqueue didn't happen
+				m.IncQueue(-1)
+				close(dirtyCh)
+				_ = <-sendErrCh
+				m.LogSummary("ctx_cancelled=true")
+				return ctx.Err()
+			}
 		}
 	}
+
 	if err := rows.Err(); err != nil {
+		close(dirtyCh)
+		_ = <-sendErrCh
+		m.LogSummary("rows_err=true")
+		return fmt.Errorf("GetBrowsingStateDistinctBranchesIncrementalGrouping rows: %w", err)
+	}
+
+	// Finish sending remaining pending updates and wait for sender to exit.
+	close(dirtyCh)
+	if err := <-sendErrCh; err != nil {
+		m.LogSummary("send_err=true")
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		m.LogSummary("commit_err=true")
+		return fmt.Errorf("GetBrowsingStateDistinctBranchesIncrementalGrouping commit: %w", err)
+	}
+
+	// final metrics
+	m.LogSummary("")
+	return nil
+}
+
+func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesFull(
+	req *pb.GetBrowsingStateRequest,
+	stream pb.DataLoader_GetBrowsingStateDistinctBranchesFullServer,
+) error {
+	ctx := stream.Context()
+	// ---------- Parse request params ----------
+	axisOrder, axisX, axisY, axisZ, filters, err := parseAxesAndFilters(req)
+	if axisOrder == nil {
+		return fmt.Errorf("invalid axis filter order")
+	}
+	if err != nil {
+		return err
+	}
+
+	// ---------- Axis positions ----------
+	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "DistinctBranchesFull(initAxes).exec"); err != nil {
+		return err
+	}
+
+	// ---------- State semantics via in-memory grouping ----------
+	sqlStr := qg.GenerateUngroupedSQLForState(
+		axisOrder,
+		axisX.Type, axisX.Id,
+		axisY.Type, axisY.Id,
+		axisZ.Type, axisZ.Id,
+		filters,
+		qg.UngroupedOpts{BranchDistinct: true},
+	)
+	if sqlStr == "" {
+		sqlStr = `select 1 as x_id, 1 as y_id, 1 as z_id, O.id as object_id, O.file_uri, O.thumbnail_uri from medias O;`
+	}
+	traceSQL("DistinctBranchesFull(ungrouped, distinct-branches).exec", formatSQLForLog("\n"+sqlStr, nil, sqlTraceMaxLtr))
+
+	// ---------- Instrumentation Init ----------
+	m := NewStreamMetrics("DistinctBranchesFull")
+
+	// ---------- TX scope (ReadOnly + optional SET LOCAL) ----------
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return fmt.Errorf("GetBrowsingStateDistinctBranchesFull begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if disableHashJoins {
+		if _, err := tx.ExecContext(ctx, "SET LOCAL enable_hashjoin = off"); err != nil {
+			return fmt.Errorf("GetBrowsingStateDistinctBranchesFull set enable_hashjoin=off: %w", err)
+		}
+	}
+
+	rows, err := tx.QueryContext(ctx, sqlStr)
+	if err != nil {
+		return fmt.Errorf("getBrowsingStateDistinctBranchesFull ungrouped: %w", err)
+	}
+	defer rows.Close()
+
+	// ---------- Grouping goroutine ----------
+	type tuple struct {
+		key      cellKey
+		objectID int32
+		fileURI  string
+		thumbURI string
+	}
+
+	tupleCh := make(chan tuple, 4096)
+	resultCh := make(chan map[cellKey]*cellAgg, 1)
+	groupErrCh := make(chan error, 1)
+
+	go func() {
+		cells := make(map[cellKey]*cellAgg, defaultCellMapCap)
+
+		for t := range tupleCh {
+			// dequeue -> decrease depth
+			m.IncQueue(-1)
+
+			agg := cells[t.key]
+			if agg == nil {
+				agg = &cellAgg{seen: make(map[int32]struct{}, 8)}
+				cells[t.key] = agg
+			}
+
+			if _, ok := agg.seen[t.objectID]; !ok {
+				agg.seen[t.objectID] = struct{}{}
+				agg.count++
+			}
+			if t.objectID > agg.repID {
+				agg.repID = t.objectID
+				agg.fileURI = t.fileURI
+				agg.thumbURI = t.thumbURI
+			}
+		}
+
+		resultCh <- cells
+		groupErrCh <- nil
+	}()
+
+	// ---------- Scan all rows (no streaming yet — emit only final results) ----------
+scanLoop:
+	for {
+		select {
+		case <-ctx.Done():
+			close(tupleCh)
+			_ = <-groupErrCh
+			_ = <-resultCh
+			return ctx.Err()
+		default:
+		}
+
+		if !rows.Next() {
+			break scanLoop
+		}
+
+		atomic.AddInt64(&m.RowsRead, 1)
+		m.MarkFirstRow()
+
+		var r rowCell
+		if err := rows.Scan(&r.X, &r.Y, &r.Z, &r.Id, &r.FileUri, &r.ThumbnailUri); err != nil {
+			close(tupleCh)
+			_ = <-groupErrCh
+			_ = <-resultCh
+			return fmt.Errorf("getBrowsingStateDistinctBranchesFull scan: %w", err)
+		}
+
+		px := axisX.Ids[r.X]
+		if px == 0 {
+			px = defAxisPos
+		}
+		py := axisY.Ids[r.Y]
+		if py == 0 {
+			py = defAxisPos
+		}
+		pz := axisZ.Ids[r.Z]
+		if pz == 0 {
+			pz = defAxisPos
+		}
+
+		t := tuple{
+			key:      cellKey{int32(px), int32(py), int32(pz)},
+			objectID: r.Id,
+			fileURI:  r.FileUri,
+			thumbURI: r.ThumbnailUri,
+		}
+
+		m.IncQueue(+1)
+		select {
+		case tupleCh <- t:
+			atomic.AddInt64(&m.ItemsProduced, 1)
+		case <-ctx.Done():
+			m.IncQueue(-1) // undo the +1 since it never entered the queue
+			close(tupleCh)
+			_ = <-groupErrCh
+			_ = <-resultCh
+			return ctx.Err()
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		close(tupleCh)
+		_ = <-groupErrCh
+		_ = <-resultCh
 		return fmt.Errorf("getBrowsingStateDistinctBranchesFull rows: %w", err)
 	}
 
-	for k := range cells {
-		a := cells[k]
+	// Finish grouping
+	close(tupleCh)
+	if err := <-groupErrCh; err != nil {
+		_ = <-resultCh
+		return err
+	}
+	cells := <-resultCh
+	m.MarkGroupDone()
+
+	// ---------- Send final authoritative results ----------
+	for k, a := range cells {
 		resp := &pb.BrowsingStateResponse{
 			X:     k.x,
 			Y:     k.y,
@@ -771,27 +869,51 @@ func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesFull(req *pb.GetBrows
 				ThumbnailUri: a.thumbURI,
 			}},
 		}
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
+
+		m.MarkFirstSend()
+
 		if err := stream.Send(resp); err != nil {
 			return err
 		}
+		atomic.AddInt64(&m.ItemsSent, 1)
 	}
+
+	// Commit (matches your other tx-scoped handlers)
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("GetBrowsingStateDistinctBranchesFull commit: %w", err)
+	}
+
+	total := time.Since(m.Start)
+
+	// ---------- One-line summary (not in hot loops) ----------
+	// Use your own logger/tracer if you prefer.
+	log.Printf(
+		"DistinctBranchesFull metrics: rowsRead=%d uniqueCells=%d maxQueueDepth=%d firstRow=%s groupingDone=%s firstSend=%s total=%s",
+		atomic.LoadInt64(&m.RowsRead),
+		len(cells),
+		atomic.LoadInt64(&m.MaxQueueDepth),
+		time.Duration(atomic.LoadInt64(&m.FirstRowNS)),
+		time.Duration(atomic.LoadInt64(&m.DoneGroupNS)),
+		time.Duration(atomic.LoadInt64(&m.FirstSendNS)),
+		total,
+	)
 
 	return nil
 }
 
-// GetBrowsingStateNonDistinctBranchesSingles: DB join only, no grouping; stream each tuple with Count=1.
-// Client is responsible for grouping/aggregation & deduplication.
-func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesSingles(req *pb.GetBrowsingStateRequest, stream pb.DataLoader_GetBrowsingStateNonDistinctBranchesSinglesServer) error {
+func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesSingles(
+	req *pb.GetBrowsingStateRequest,
+	stream pb.DataLoader_GetBrowsingStateNonDistinctBranchesSinglesServer,
+) error {
 	ctx := stream.Context()
 
-	// ---------- Parse request params ----------
 	axisOrder, axisX, axisY, axisZ, filters, err := parseAxesAndFilters(req)
-
 	if axisOrder == nil {
 		return fmt.Errorf("invalid axis filter order")
 	}
@@ -799,12 +921,10 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesSingles(req *pb.Ge
 		return err
 	}
 
-	// ---------- Axis positions ----------
-	if err := initXYZAxes(stream.Context(), s.db, &axisX, &axisY, &axisZ, "NonDistinctBranchesSingles(initAxes).exec"); err != nil {
+	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "NonDistinctBranchesSingles(initAxes).exec"); err != nil {
 		return err
 	}
 
-	// ---------- Ungrouped SQL ----------
 	sqlStr := qg.GenerateUngroupedSQLForState(
 		axisOrder,
 		axisX.Type, axisX.Id,
@@ -818,55 +938,62 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesSingles(req *pb.Ge
 
 	traceSQL("NonDistinctBranchesSingles.ungrouped", formatSQLForLog("\n"+sqlStr, nil, sqlTraceMaxLtr))
 
-	rows, err := s.db.QueryContext(ctx, sqlStr)
+	// ---------- Instrumentation Init ----------
+	m := NewStreamMetrics("NonDistinctBranchesSingles")
+
+	// ---------- TX scope (ReadOnly + optional SET LOCAL) ----------
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return fmt.Errorf("GetBrowsingStateNonDistinctBranchesSingles begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if disableHashJoins {
+		if _, err := tx.ExecContext(ctx, "SET LOCAL enable_hashjoin = off"); err != nil {
+			return fmt.Errorf("GetBrowsingStateNonDistinctBranchesSingles set enable_hashjoin=off: %w", err)
+		}
+	}
+
+	rows, err := tx.QueryContext(ctx, sqlStr)
 	if err != nil {
 		return fmt.Errorf("GetBrowsingStateNonDistinctBranchesSingles state query: %w", err)
 	}
 	defer rows.Close()
 
-	flushTicker := time.NewTicker(flushInterval)
-	defer flushTicker.Stop()
+	// ---------- Dedicated sender goroutine ----------
+	respCh := make(chan *pb.BrowsingStateResponse, 4096)
+	sendErrCh := make(chan error, 1)
 
-	pending := make([]*pb.BrowsingStateResponse, 0, batchSize)
+	go func() {
+		sendErrCh <- RunQueueSenderWithMetrics(ctx, stream, respCh, m)
+	}()
 
-	flush := func(force bool) error {
-		if !force && len(pending) < batchSize {
-			return nil
-		}
-		for _, r := range pending {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-			}
-			if err := stream.Send(r); err != nil {
-				return err
-			}
-		}
-		pending = pending[:0]
-		return nil
-	}
-
-sendLoop:
+scanLoop:
 	for {
 		select {
 		case <-ctx.Done():
+			close(respCh)
+			_ = <-sendErrCh
+			m.LogSummary("ctx_cancelled=true")
 			return ctx.Err()
-		case <-flushTicker.C:
-			if err := flush(false); err != nil {
-				return err
-			}
 		default:
 		}
 
 		if !rows.Next() {
-			break sendLoop
+			break scanLoop
 		}
 
 		var r rowCell
 		if err := rows.Scan(&r.X, &r.Y, &r.Z, &r.Id, &r.FileUri, &r.ThumbnailUri); err != nil {
+			close(respCh)
+			_ = <-sendErrCh
+			m.LogSummary("scan_error=true")
 			return fmt.Errorf("GetBrowsingStateNonDistinctBranchesSingles scan: %w", err)
 		}
+
+		// Successfully scanned a row
+		atomic.AddInt64(&m.RowsRead, 1)
+		m.MarkFirstRow()
 
 		px := axisX.Ids[r.X]
 		if px == 0 {
@@ -885,38 +1012,63 @@ sendLoop:
 			X:     int32(px),
 			Y:     int32(py),
 			Z:     int32(pz),
-			Count: 1, // each tuple contributes 1; client aggregates and deduplicates
+			Count: 1,
 			CubeObjects: []*pb.CubeObject{{
 				Id:           r.Id,
 				FileUri:      r.FileUri,
 				ThumbnailUri: r.ThumbnailUri,
 			}},
 		}
-		pending = append(pending, resp)
-		if err := flush(false); err != nil {
-			return err
+
+		// Count "produced" only if enqueue succeeds. Track queue depth as backpressure evidence.
+		m.IncQueue(+1)
+		select {
+		case respCh <- resp:
+			atomic.AddInt64(&m.ItemsProduced, 1)
+		case <-ctx.Done():
+			// Undo queue increment since it never entered the queue.
+			m.IncQueue(-1)
+			close(respCh)
+			_ = <-sendErrCh
+			m.LogSummary("ctx_cancelled=true")
+			return ctx.Err()
 		}
 	}
 
 	if err := rows.Err(); err != nil {
+		close(respCh)
+		_ = <-sendErrCh
+		m.LogSummary("rows_err=true")
 		return fmt.Errorf("GetBrowsingStateNonDistinctBranchesSingles rows iteration: %w", err)
 	}
-	return flush(true)
+
+	close(respCh)
+	if err := <-sendErrCh; err != nil {
+		m.LogSummary("send_err=true")
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		m.LogSummary("commit_err=true")
+		return fmt.Errorf("GetBrowsingStateNonDistinctBranchesSingles commit: %w", err)
+	}
+
+	m.LogSummary("")
+	return nil
 }
 
-// GetBrowsingStateNonDistinctBranchesDeduplicatedSingles:
-// - Runs the same ungrouped (no GROUP BY, no DISTINCT) SQL as NonDistinctBranchesSingles.
-// - Streams one response per *unique* (cell, object_id) tuple with Count=1.
-// - Dedup semantics per cell mirror NonDistinctBranchesChunks (maintains a per-cell seen set).
 func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesDeduplicatedSingles(
 	req *pb.GetBrowsingStateRequest,
 	stream pb.DataLoader_GetBrowsingStateNonDistinctBranchesDeduplicatedSinglesServer,
 ) error {
 	ctx := stream.Context()
 
-	// ---------- Parse request params ----------
-	axisOrder, axisX, axisY, axisZ, filters, err := parseAxesAndFilters(req)
+	// Toggle for experiments:
+	// - false: dedup in scan loop (likely faster, less queue traffic)
+	// - true:  dedup in sender goroutine (interesting for comparison / backpressure evidence)
+	dedupInSender := false
 
+	axisOrder, axisX, axisY, axisZ, filters, err := parseAxesAndFilters(req)
 	if axisOrder == nil {
 		return fmt.Errorf("invalid axis filter order")
 	}
@@ -924,12 +1076,10 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesDeduplicatedSingle
 		return err
 	}
 
-	// ---------- Axis positions ----------
 	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "NonDistinctBranchesDedupSingles(initAxes).exec"); err != nil {
 		return err
 	}
 
-	// ---------- Ungrouped SQL (no DISTINCT, no GROUP BY) ----------
 	sqlStr := qg.GenerateUngroupedSQLForState(
 		axisOrder,
 		axisX.Type, axisX.Id,
@@ -942,60 +1092,89 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesDeduplicatedSingle
 	}
 	traceSQL("NonDistinctBranchesDedupSingles.ungrouped", formatSQLForLog("\n"+sqlStr, nil, sqlTraceMaxLtr))
 
-	rows, err := s.db.QueryContext(ctx, sqlStr)
+	// ---------- Instrumentation Init ----------
+	m := NewStreamMetrics("NonDistinctBranchesDeduplicatedSingles")
+
+	// ---------- TX scope (ReadOnly + optional SET LOCAL) ----------
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return fmt.Errorf("GetBrowsingStateNonDistinctBranchesDeduplicatedSingles begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if disableHashJoins {
+		if _, err := tx.ExecContext(ctx, "SET LOCAL enable_hashjoin = off"); err != nil {
+			return fmt.Errorf("GetBrowsingStateNonDistinctBranchesDeduplicatedSingles set enable_hashjoin=off: %w", err)
+		}
+	}
+
+	rows, err := tx.QueryContext(ctx, sqlStr)
 	if err != nil {
 		return fmt.Errorf("GetBrowsingStateNonDistinctBranchesDeduplicatedSingles state query: %w", err)
 	}
 	defer rows.Close()
 
-	// Per-cell DISTINCT guard: object_id set
-	seen := make(map[cellKey]map[int32]struct{}, defaultCellMapCap)
+	// ---------- Dedicated sender goroutine ----------
+	sendErrCh := make(chan error, 1)
 
-	flushTicker := time.NewTicker(flushInterval)
-	defer flushTicker.Stop()
+	// For “dedup in scan” we enqueue responses.
+	var respCh chan *pb.BrowsingStateResponse
+	// For “dedup in sender” we enqueue tuples.
+	var itemCh chan DedupTuple
 
-	pending := make([]*pb.BrowsingStateResponse, 0, batchSize)
-
-	flush := func(force bool) error {
-		if !force && len(pending) < batchSize {
-			return nil
-		}
-		for _, r := range pending {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-			}
-			if err := stream.Send(r); err != nil {
-				return err
-			}
-		}
-		pending = pending[:0]
-		return nil
+	if dedupInSender {
+		itemCh = make(chan DedupTuple, 4096)
+		go func() {
+			sendErrCh <- RunQueueSenderDedupWithMetrics(ctx, stream, itemCh, 16, 65536, m)
+		}()
+	} else {
+		respCh = make(chan *pb.BrowsingStateResponse, 4096)
+		go func() {
+			sendErrCh <- RunQueueSenderWithMetrics(ctx, stream, respCh, m)
+		}()
 	}
 
-sendLoop:
+	// If dedup is in scan:
+	var seen map[cellKey]map[int32]struct{}
+	if !dedupInSender {
+		seen = make(map[cellKey]map[int32]struct{}, 65536)
+	}
+
+scanLoop:
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
-		case <-flushTicker.C:
-			if err := flush(false); err != nil {
-				return err
+			if dedupInSender {
+				close(itemCh)
+			} else {
+				close(respCh)
 			}
+			_ = <-sendErrCh
+			m.LogSummary("ctx_cancelled=true")
+			return ctx.Err()
 		default:
 		}
 
 		if !rows.Next() {
-			break sendLoop
+			break scanLoop
 		}
 
 		var r rowCell
 		if err := rows.Scan(&r.X, &r.Y, &r.Z, &r.Id, &r.FileUri, &r.ThumbnailUri); err != nil {
+			if dedupInSender {
+				close(itemCh)
+			} else {
+				close(respCh)
+			}
+			_ = <-sendErrCh
+			m.LogSummary("scan_error=true")
 			return fmt.Errorf("GetBrowsingStateNonDistinctBranchesDeduplicatedSingles scan: %w", err)
 		}
 
-		// Map DB IDs -> axis positions (default 1 when axis empty)
+		// Successfully scanned a row
+		atomic.AddInt64(&m.RowsRead, 1)
+		m.MarkFirstRow()
+
 		px := axisX.Ids[r.X]
 		if px == 0 {
 			px = defAxisPos
@@ -1010,18 +1189,42 @@ sendLoop:
 		}
 		key := cellKey{int32(px), int32(py), int32(pz)}
 
-		// Deduplicate like *Chunks*: ensure each object_id is emitted once per cell
+		if dedupInSender {
+			// Enqueue everything; sender deduplicates.
+			it := DedupTuple{
+				Key:      key,
+				ObjectID: r.Id,
+				FileURI:  r.FileUri,
+				ThumbURI: r.ThumbnailUri,
+			}
+
+			// Count "produced" only if enqueue succeeds; track queue depth for backpressure.
+			m.IncQueue(+1)
+			select {
+			case itemCh <- it:
+				atomic.AddInt64(&m.ItemsProduced, 1)
+			case <-ctx.Done():
+				m.IncQueue(-1)
+				close(itemCh)
+				_ = <-sendErrCh
+				m.LogSummary("ctx_cancelled=true")
+				return ctx.Err()
+			}
+			continue
+		}
+
+		// Deduplicate in scan loop (likely faster)
 		sset := seen[key]
 		if sset == nil {
 			sset = make(map[int32]struct{}, 16)
 			seen[key] = sset
 		}
 		if _, dup := sset[r.Id]; dup {
-			// skip duplicates for this cell
+			atomic.AddInt64(&m.DupsSkipped, 1)
 			continue
 		}
 		sset[r.Id] = struct{}{}
-		// Emit a single-row response (like Singles), Count=1
+
 		resp := &pb.BrowsingStateResponse{
 			X:     key.x,
 			Y:     key.y,
@@ -1033,25 +1236,62 @@ sendLoop:
 				ThumbnailUri: r.ThumbnailUri,
 			}},
 		}
-		pending = append(pending, resp)
 
-		if err := flush(false); err != nil {
-			return err
+		// Count "produced" only if enqueue succeeds; track queue depth for backpressure.
+		m.IncQueue(+1)
+		select {
+		case respCh <- resp:
+			atomic.AddInt64(&m.ItemsProduced, 1)
+		case <-ctx.Done():
+			m.IncQueue(-1)
+			close(respCh)
+			_ = <-sendErrCh
+			m.LogSummary("ctx_cancelled=true")
+			return ctx.Err()
 		}
 	}
 
 	if err := rows.Err(); err != nil {
+		if dedupInSender {
+			close(itemCh)
+		} else {
+			close(respCh)
+		}
+		_ = <-sendErrCh
+		m.LogSummary("rows_err=true")
 		return fmt.Errorf("GetBrowsingStateNonDistinctBranchesDeduplicatedSingles rows iteration: %w", err)
 	}
-	return flush(true)
+
+	// Signal sender completion, wait, then commit
+	if dedupInSender {
+		close(itemCh)
+	} else {
+		close(respCh)
+	}
+
+	if err := <-sendErrCh; err != nil {
+		m.LogSummary("send_err=true")
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		m.LogSummary("commit_err=true")
+		return fmt.Errorf("GetBrowsingStateNonDistinctBranchesDeduplicatedSingles commit: %w", err)
+	}
+
+	m.LogSummary("")
+	return nil
 }
 
-// GetBrowsingStateNonDistinctBranches: DB does one intersecting join (no GROUP BY, no DISTINCT).
-// Go aggregates per (x,y,z) online and streams authoritative updates.
-// stream.Send happens only inside StreamSender (dedicated goroutine).
-func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesIncrementalGrouping(
+// GetBrowsingStateNonDistinctBranchesFull:
+// - Runs an ungrouped (no GROUP BY, no DISTINCT) join on the DB (non-distinct branches).
+// - Performs per-cell DISTINCT(object_id) counting + representative MAX(object_id) in a grouping goroutine.
+// - Sends authoritative final results ONLY after grouping completes (no incremental streaming).
+// - Uses tx scope and optional SET LOCAL enable_hashjoin=off.
+// - Includes StreamMetrics instrumentation (rowsRead, produced tuples, max queue depth, firstRow, groupDone, firstSend, sent).
+func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesFull(
 	req *pb.GetBrowsingStateRequest,
-	stream pb.DataLoader_GetBrowsingStateNonDistinctBranchesIncrementalGroupingServer,
+	stream pb.DataLoader_GetBrowsingStateNonDistinctBranchesFullServer,
 ) error {
 	ctx := stream.Context()
 
@@ -1065,6 +1305,233 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesIncrementalGroupin
 	}
 
 	// ---------- Axis positions ----------
+	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "NonDistinctBranchesFull(initAxes).exec"); err != nil {
+		return err
+	}
+
+	// ---------- Ungrouped SQL (NO DISTINCT, NO GROUP BY) ----------
+	qgOpts := qg.UngroupedOpts{
+		BranchDistinct:      false,
+		UseLateralMediaJoin: useLateralMediaJoin,
+	}
+	sqlStr := qg.GenerateUngroupedSQLForState(
+		axisOrder,
+		axisX.Type, axisX.Id,
+		axisY.Type, axisY.Id,
+		axisZ.Type, axisZ.Id,
+		filters,
+		qgOpts,
+	)
+	if sqlStr == "" {
+		sqlStr = `select 1 as x_id, 1 as y_id, 1 as z_id, O.id as object_id, O.file_uri, O.thumbnail_uri from medias O;`
+	}
+	traceSQL("NonDistinctBranchesFull.ungrouped", formatSQLForLog("\n"+sqlStr, nil, sqlTraceMaxLtr))
+
+	// ---------- Instrumentation Init ----------
+	m := NewStreamMetrics("NonDistinctBranchesFull")
+
+	// ---------- TX scope (ReadOnly + optional SET LOCAL) ----------
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return fmt.Errorf("GetBrowsingStateNonDistinctBranchesFull begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if disableHashJoins {
+		if _, err := tx.ExecContext(ctx, "SET LOCAL enable_hashjoin = off"); err != nil {
+			return fmt.Errorf("GetBrowsingStateNonDistinctBranchesFull set enable_hashjoin=off: %w", err)
+		}
+	}
+
+	rows, err := tx.QueryContext(ctx, sqlStr)
+	if err != nil {
+		return fmt.Errorf("GetBrowsingStateNonDistinctBranchesFull state query: %w", err)
+	}
+	defer rows.Close()
+
+	// ---------- Grouping goroutine ----------
+	type tuple struct {
+		key      cellKey
+		objectID int32
+		fileURI  string
+		thumbURI string
+	}
+
+	// Same buffering strategy as your other full/grouped variants
+	tupleCh := make(chan tuple, 4096)
+	resultCh := make(chan map[cellKey]*cellAgg, 1)
+	groupErrCh := make(chan error, 1)
+
+	go func() {
+		cells := make(map[cellKey]*cellAgg, defaultCellMapCap)
+
+		for t := range tupleCh {
+			// consumed from queue
+			m.IncQueue(-1)
+
+			agg := cells[t.key]
+			if agg == nil {
+				agg = &cellAgg{seen: make(map[int32]struct{}, 16)}
+				cells[t.key] = agg
+			}
+
+			// DISTINCT object_id per cell
+			if _, ok := agg.seen[t.objectID]; !ok {
+				agg.seen[t.objectID] = struct{}{}
+				agg.count++
+			}
+
+			// Representative = MAX(object_id)
+			if t.objectID > agg.repID {
+				agg.repID = t.objectID
+				agg.fileURI = t.fileURI
+				agg.thumbURI = t.thumbURI
+			}
+		}
+
+		resultCh <- cells
+		groupErrCh <- nil
+	}()
+
+	// ---------- Scan rows, push tuples (no grouping in scan loop) ----------
+scanLoop:
+	for {
+		select {
+		case <-ctx.Done():
+			close(tupleCh)
+			_ = <-groupErrCh
+			_ = <-resultCh
+			m.LogSummary("ctx_cancelled=true")
+			return ctx.Err()
+		default:
+		}
+
+		if !rows.Next() {
+			break scanLoop
+		}
+
+		var r rowCell
+		if err := rows.Scan(&r.X, &r.Y, &r.Z, &r.Id, &r.FileUri, &r.ThumbnailUri); err != nil {
+			close(tupleCh)
+			_ = <-groupErrCh
+			_ = <-resultCh
+			m.LogSummary("scan_error=true")
+			return fmt.Errorf("GetBrowsingStateNonDistinctBranchesFull scan: %w", err)
+		}
+
+		// Successfully scanned a row
+		atomic.AddInt64(&m.RowsRead, 1)
+		m.MarkFirstRow()
+
+		px := axisX.Ids[r.X]
+		if px == 0 {
+			px = defAxisPos
+		}
+		py := axisY.Ids[r.Y]
+		if py == 0 {
+			py = defAxisPos
+		}
+		pz := axisZ.Ids[r.Z]
+		if pz == 0 {
+			pz = defAxisPos
+		}
+
+		t := tuple{
+			key:      cellKey{int32(px), int32(py), int32(pz)},
+			objectID: r.Id,
+			fileURI:  r.FileUri,
+			thumbURI: r.ThumbnailUri,
+		}
+
+		// Track queue depth; count produced only if enqueue succeeds.
+		m.IncQueue(+1)
+		select {
+		case tupleCh <- t:
+			atomic.AddInt64(&m.ItemsProduced, 1)
+		case <-ctx.Done():
+			m.IncQueue(-1)
+			close(tupleCh)
+			_ = <-groupErrCh
+			_ = <-resultCh
+			m.LogSummary("ctx_cancelled=true")
+			return ctx.Err()
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		close(tupleCh)
+		_ = <-groupErrCh
+		_ = <-resultCh
+		m.LogSummary("rows_err=true")
+		return fmt.Errorf("GetBrowsingStateNonDistinctBranchesFull rows: %w", err)
+	}
+
+	// Finish grouping
+	close(tupleCh)
+	if err := <-groupErrCh; err != nil {
+		_ = <-resultCh
+		m.LogSummary("group_err=true")
+		return err
+	}
+	cells := <-resultCh
+	m.MarkGroupDone()
+
+	// ---------- Send final authoritative results ----------
+	for k, a := range cells {
+		resp := &pb.BrowsingStateResponse{
+			X:     k.x,
+			Y:     k.y,
+			Z:     k.z,
+			Count: a.count,
+			CubeObjects: []*pb.CubeObject{{
+				Id:           a.repID,
+				FileUri:      a.fileURI,
+				ThumbnailUri: a.thumbURI,
+			}},
+		}
+
+		select {
+		case <-ctx.Done():
+			m.LogSummary("ctx_cancelled=true")
+			return ctx.Err()
+		default:
+		}
+
+		m.MarkFirstSend()
+		if err := stream.Send(resp); err != nil {
+			m.LogSummary("send_err=true")
+			return err
+		}
+		atomic.AddInt64(&m.ItemsSent, 1)
+	}
+
+	if err := tx.Commit(); err != nil {
+		m.LogSummary("commit_err=true")
+		return fmt.Errorf("GetBrowsingStateNonDistinctBranchesFull commit: %w", err)
+	}
+
+	// Include uniqueCells in the summary as extra context
+	m.LogSummary(fmt.Sprintf("uniqueCells=%d", len(cells)))
+	return nil
+}
+
+// GetBrowsingStateNonDistinctBranches: DB does one intersecting join (no GROUP BY, no DISTINCT).
+// Go aggregates per (x,y,z) online and streams authoritative updates.
+// stream.Send happens only inside KeyFlusher (dedicated goroutine).
+func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesIncrementalGrouping(
+	req *pb.GetBrowsingStateRequest,
+	stream pb.DataLoader_GetBrowsingStateNonDistinctBranchesIncrementalGroupingServer,
+) error {
+	ctx := stream.Context()
+
+	axisOrder, axisX, axisY, axisZ, filters, err := parseAxesAndFilters(req)
+	if axisOrder == nil {
+		return fmt.Errorf("invalid axis filter order")
+	}
+	if err != nil {
+		return err
+	}
+
 	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "NonDistinctBranchesIncrementalGrouping(initAxes).exec"); err != nil {
 		return err
 	}
@@ -1074,7 +1541,6 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesIncrementalGroupin
 		UseLateralMediaJoin: useLateralMediaJoin,
 	}
 
-	// ---------- Ungrouped SQL (no DISTINCT, no GROUP BY) ----------
 	sqlStr := qg.GenerateUngroupedSQLForState(
 		axisOrder,
 		axisX.Type, axisX.Id,
@@ -1087,6 +1553,9 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesIncrementalGroupin
 	}
 
 	traceSQL("NonDistinctBranchesIncrementalGrouping.ungrouped", formatSQLForLog("\n"+sqlStr, nil, 128))
+
+	// ---------- Instrumentation Init ----------
+	m := NewStreamMetrics("NonDistinctBranchesIncrementalGrouping")
 
 	// ---------- TX scope (ReadOnly + optional SET LOCAL) ----------
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
@@ -1107,87 +1576,27 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesIncrementalGroupin
 	}
 	defer rows.Close()
 
-	// ---------- StreamSender: owns stream.Send + batching ----------
-	sender := StartStreamSender(
-		ctx,
-		DefaultSendFn(stream),
-		StreamSenderOpts{
-			ChanSize: dirtyChanCap,
-			Batcher: BatcherOpts{
-				BatchSize:     batchSize,
-				FlushInterval: flushInterval,
-				MaxFirstFlush: maxFirstFlush, // set 0 if you don't want first-flush semantics here
-				InitialCap:    batchSize,
-			},
-		},
-	)
-	defer sender.Cancel()
+	// Keep old large buffers for perf baseline
+	dirtyCh := make(chan cellKey, 65536)
 
-	// ---------- Shared state between scanner (writer) and key-flusher (reader) ----------
-	cells := make(map[cellKey]*cellAgg, defaultCellMapCap)
+	agg := NewCellAggregator(CellAggregatorOpts{
+		InitialCap: 65536,
+		SeenCap:    16,
+	})
 
-	// "queued" prevents enqueueing the same key many times before it is acknowledged.
-	queued := make(map[cellKey]bool, defaultCellMapCap)
-
-	var mu sync.RWMutex // protects both cells and queued
-
-	// Dirty key queue to key-flusher. Bounded buffer provides backpressure.
-	dirtyCh := make(chan cellKey, defaultDirtyCap)
-
-	// Key-flusher reports its first error here (sender errors are returned by sender.CloseAndWait()).
-	keyFlushErrCh := make(chan error, 1)
-
-	// ---------- Key-flusher goroutine: builds authoritative updates per key ----------
-	// NOTE: stream.Send happens ONLY inside StreamSender, not here.
+	// Key flusher goroutine: owns stream.Send
+	errCh := make(chan error, 1)
 	go func() {
-		ticker := time.NewTicker(flushInterval)
-		defer ticker.Stop()
-
-		// pending is a set of keys that should be flushed.
-		pending := make(map[cellKey]struct{}, defaultCellMapCap)
-
-		flush := func(force bool) error {
-			if !force && len(pending) == 0 {
-				return nil
-			}
-
-			// Choose keys to send this round (bounded by streamBatchSize unless forced).
-			keys := make([]cellKey, 0, len(pending))
-			for k := range pending {
-				keys = append(keys, k)
-				if !force && len(keys) >= streamBatchSize {
-					break
-				}
-			}
-
-			snaps := make([]snap, 0, len(keys))
-
-			mu.RLock()
-			for _, k := range keys {
-				agg := cells[k]
-				if agg == nil {
-					continue
-				}
-				snaps = append(snaps, snap{
-					k:        k,
-					count:    agg.count,
-					repID:    agg.repID,
-					fileURI:  agg.fileURI,
-					thumbURI: agg.thumbURI,
-					rev:      agg.rev,
-				})
-			}
-			mu.RUnlock()
-
-			// Enqueue outside locks (StreamSender will do the actual stream.Send).
-			for _, sn := range snaps {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				default:
-				}
-
-				resp := &pb.BrowsingStateResponse{
+		errCh <- RunKeyFlusherWithMetrics(
+			ctx,
+			stream,
+			dirtyCh,
+			agg,
+			flushInterval,
+			streamBatchSize,
+			65536,
+			func(sn snap) *pb.BrowsingStateResponse {
+				return &pb.BrowsingStateResponse{
 					X:     sn.k.x,
 					Y:     sn.k.y,
 					Z:     sn.k.z,
@@ -1198,69 +1607,18 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesIncrementalGroupin
 						ThumbnailUri: sn.thumbURI,
 					}},
 				}
-				if err := sender.Enqueue(resp); err != nil {
-					return err
-				}
-
-				// Mark as no longer pending and allow scanner to enqueue again if it changes later.
-				delete(pending, sn.k)
-				mu.Lock()
-				cur := cells[sn.k]
-				if cur != nil && cur.rev > sn.rev {
-					// It changed after we snapshotted (or while we were enqueueing).
-					// Keep it queued and re-send by putting back into pending.
-					pending[sn.k] = struct{}{}
-					// queued stays true (do NOT set to false)
-				} else {
-					// No changes since snapshot: allow scanner to enqueue again later
-					queued[sn.k] = false
-				}
-				mu.Unlock()
-			}
-
-			return nil
-		}
-
-		for {
-			select {
-			case <-ctx.Done():
-				keyFlushErrCh <- ctx.Err()
-				return
-
-			case k, ok := <-dirtyCh:
-				if !ok {
-					// Scanner finished: flush remaining pending keys.
-					keyFlushErrCh <- flush(true)
-					return
-				}
-				pending[k] = struct{}{}
-
-				// If we have enough pending, flush immediately (not just on ticks).
-				if len(pending) >= streamBatchSize {
-					if err := flush(false); err != nil {
-						keyFlushErrCh <- err
-						return
-					}
-				}
-
-			case <-ticker.C:
-				if err := flush(false); err != nil {
-					keyFlushErrCh <- err
-					return
-				}
-			}
-		}
+			},
+			m,
+		)
 	}()
 
-	// ---------- Scanner loop: reads rows, updates aggregates, enqueues dirty keys ----------
 scanLoop:
 	for {
 		select {
 		case <-ctx.Done():
-			// Stop early; key-flusher + sender will also exit via ctx.
 			close(dirtyCh)
-			_ = <-keyFlushErrCh
-			_ = sender.CloseAndWait()
+			_ = <-errCh
+			m.LogSummary("ctx_cancelled=true")
 			return ctx.Err()
 		default:
 		}
@@ -1272,10 +1630,14 @@ scanLoop:
 		var r rowCell
 		if err := rows.Scan(&r.X, &r.Y, &r.Z, &r.Id, &r.FileUri, &r.ThumbnailUri); err != nil {
 			close(dirtyCh)
-			_ = <-keyFlushErrCh
-			_ = sender.CloseAndWait()
+			_ = <-errCh
+			m.LogSummary("scan_error=true")
 			return fmt.Errorf("GetBrowsingStateNonDistinctBranchesIncrementalGrouping scan: %w", err)
 		}
+
+		// Successfully scanned a row
+		atomic.AddInt64(&m.RowsRead, 1)
+		m.MarkFirstRow()
 
 		px := axisX.Ids[r.X]
 		if px == 0 {
@@ -1291,51 +1653,20 @@ scanLoop:
 		}
 
 		key := cellKey{int32(px), int32(py), int32(pz)}
-
-		// Update aggregate under write lock
-		mu.Lock()
-		agg := cells[key]
-		if agg == nil {
-			agg = &cellAgg{seen: make(map[int32]struct{}, 16)}
-			cells[key] = agg
-		}
-
-		changed := false
-
-		// DISTINCT object per cell
-		if _, ok := agg.seen[r.Id]; !ok {
-			agg.seen[r.Id] = struct{}{}
-			agg.count++
-			changed = true
-		}
-
-		// Representative policy: max object_id
-		if r.Id > agg.repID {
-			agg.repID = r.Id
-			agg.fileURI = r.FileUri
-			agg.thumbURI = r.ThumbnailUri
-			changed = true
-		}
-
-		if changed {
-			// rev is used to keep queued/pending semantics correct with concurrent enqueueing
-			agg.rev++
-		}
-
-		// Enqueue key only once until it has been acknowledged (queued=false).
-		shouldEnqueue := !queued[key]
-		if shouldEnqueue {
-			queued[key] = true
-		}
-		mu.Unlock()
+		_, shouldEnqueue := agg.ApplyRow(key, r.Id, r.FileUri, r.ThumbnailUri, 16)
 
 		if shouldEnqueue {
+			// Track dirty-key queue depth as backpressure evidence.
+			// Count produced only if enqueue succeeds.
+			m.IncQueue(+1)
 			select {
 			case dirtyCh <- key:
+				atomic.AddInt64(&m.ItemsProduced, 1)
 			case <-ctx.Done():
+				m.IncQueue(-1)
 				close(dirtyCh)
-				_ = <-keyFlushErrCh
-				_ = sender.CloseAndWait()
+				_ = <-errCh
+				m.LogSummary("ctx_cancelled=true")
 				return ctx.Err()
 			}
 		}
@@ -1343,27 +1674,23 @@ scanLoop:
 
 	if err := rows.Err(); err != nil {
 		close(dirtyCh)
-		_ = <-keyFlushErrCh
-		_ = sender.CloseAndWait()
+		_ = <-errCh
+		m.LogSummary("rows_err=true")
 		return fmt.Errorf("GetBrowsingStateNonDistinctBranchesIncrementalGrouping rows: %w", err)
 	}
 
-	// Signal key-flusher we're done scanning and wait for it to finish.
 	close(dirtyCh)
-	if err := <-keyFlushErrCh; err != nil {
-		sender.Cancel()
-		_ = sender.CloseAndWait()
-		return err
-	}
-
-	// Now stop StreamSender (final flush + wait for send loop).
-	if err := sender.CloseAndWait(); err != nil {
+	if err := <-errCh; err != nil {
+		m.LogSummary("send_err=true")
 		return err
 	}
 
 	if err := tx.Commit(); err != nil {
+		m.LogSummary("commit_err=true")
 		return fmt.Errorf("GetBrowsingStateNonDistinctBranchesIncrementalGrouping commit: %w", err)
 	}
+
+	m.LogSummary("")
 	return nil
 }
 
@@ -1494,6 +1821,10 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 		return err
 	}
 
+	// ---------- Instrumentation Init ----------
+	// Captures everything from here (sender plumbing, tx begin, query, scan, send).
+	m := NewStreamMetrics("GetBrowsingState2")
+
 	// -----------------------------------------------------------------------------
 	// Sender goroutine plumbing:
 	// - ONLY the sender goroutine calls stream.Send (gRPC streams are not safe for concurrent Send).
@@ -1506,16 +1837,22 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 	// Sender goroutine (single writer to gRPC stream)
 	go func() {
 		for resp := range sendCh {
+			// consumed from queue
+			m.IncQueue(-1)
+
 			select {
 			case <-ctx.Done():
 				sendErrCh <- ctx.Err()
 				return
 			default:
 			}
+
+			m.MarkFirstSend()
 			if err := stream.Send(resp); err != nil {
 				sendErrCh <- err
 				return
 			}
+			atomic.AddInt64(&m.ItemsSent, 1)
 		}
 		// Normal completion
 		sendErrCh <- nil
@@ -1523,11 +1860,11 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 
 	// helper to enqueue responses safely (handles cancellation + sender failure)
 	enqueue := func(resp *pb.BrowsingStateResponse) error {
+		// Fast path: check cancellation/sender failure without blocking.
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case err := <-sendErrCh:
-			// sender already failed/finished early
 			if err == nil {
 				return fmt.Errorf("sender exited unexpectedly")
 			}
@@ -1535,13 +1872,17 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 		default:
 		}
 
+		// Track backpressure: only count produced if enqueue succeeds.
+		m.IncQueue(+1)
 		select {
 		case <-ctx.Done():
+			m.IncQueue(-1) // undo (+1) because it wasn't enqueued
 			return ctx.Err()
 		case sendCh <- resp:
+			atomic.AddInt64(&m.ItemsProduced, 1)
 			return nil
 		case err := <-sendErrCh:
-			// sender failed while we were trying to enqueue
+			m.IncQueue(-1) // undo (+1) because it wasn't enqueued
 			if err == nil {
 				return fmt.Errorf("sender exited unexpectedly")
 			}
@@ -1558,11 +1899,14 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 
 		// Prefer the "real" error if one exists.
 		if retErr != nil {
+			m.LogSummary("retErr=true")
 			return retErr
 		}
 		if sendErr != nil {
+			m.LogSummary("sendErr=true")
 			return sendErr
 		}
+		m.LogSummary("")
 		return nil
 	}
 
@@ -1570,6 +1914,7 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 	allDefined := req.All != ""
 	timelineDefined := req.Timeline != ""
 	sqlStr := ""
+
 	// 2) Shortcut: “all” → PublicCubeObjects
 	if allDefined {
 		sqlStr = qg.GenerateSQLQueryForCell(
@@ -1598,6 +1943,10 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 			if err := rows.Scan(&c.Id, &c.FileUri, &c.ThumbnailUri); err != nil {
 				return finish(fmt.Errorf("GetBrowsingState failed to scan row: %w", err))
 			}
+			// Successfully scanned a row
+			atomic.AddInt64(&m.RowsRead, 1)
+			m.MarkFirstRow()
+
 			cubeObjects = append(cubeObjects, c)
 		}
 		if err := rows.Err(); err != nil {
@@ -1647,11 +1996,7 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 	}
 	defer rows.Close()
 
-	isFirst := true
 	for rows.Next() {
-		if isFirst {
-			isFirst = false
-		}
 		var r rowCell
 		if err := rows.Scan(
 			&r.X, &r.Y, &r.Z,
@@ -1660,6 +2005,10 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 		); err != nil {
 			return finish(fmt.Errorf("GetBrowsingState scan state row: %w", err))
 		}
+
+		// Successfully scanned a row
+		atomic.AddInt64(&m.RowsRead, 1)
+		m.MarkFirstRow()
 
 		// map the axis‐IDs through the position maps
 		posX := axisX.Ids[r.X]
@@ -1679,7 +2028,7 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 			}},
 		}
 
-		// enqueue instead of stream.Send (non-blocking until queue fills)
+		// enqueue instead of stream.Send (bounded queue provides backpressure)
 		if err := enqueue(resp); err != nil {
 			return finish(fmt.Errorf("GetBrowsingState enqueue state response: %w", err))
 		}
@@ -1689,5 +2038,7 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 		return finish(fmt.Errorf("GetBrowsingState rows iteration: %w", err))
 	}
 
+	// Note: original code didn't commit tx; keeping behavior identical.
+	// If you want to commit, do it here and wrap with finish(...).
 	return finish(nil)
 }

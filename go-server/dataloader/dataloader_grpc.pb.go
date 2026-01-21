@@ -58,6 +58,7 @@ const (
 	DataLoader_GetBrowsingStateDistinctBranchesFull_FullMethodName                   = "/dataloader.DataLoader/getBrowsingStateDistinctBranchesFull"
 	DataLoader_GetBrowsingStateDistinctBranchesIncrementalGrouping_FullMethodName    = "/dataloader.DataLoader/getBrowsingStateDistinctBranchesIncrementalGrouping"
 	DataLoader_GetBrowsingStateNonDistinctBranchesDeduplicatedSingles_FullMethodName = "/dataloader.DataLoader/getBrowsingStateNonDistinctBranchesDeduplicatedSingles"
+	DataLoader_GetBrowsingStateNonDistinctBranchesFull_FullMethodName                = "/dataloader.DataLoader/getBrowsingStateNonDistinctBranchesFull"
 	DataLoader_ResetDatabase_FullMethodName                                          = "/dataloader.DataLoader/resetDatabase"
 )
 
@@ -117,6 +118,7 @@ type DataLoaderClient interface {
 	GetBrowsingStateDistinctBranchesFull(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error)
 	GetBrowsingStateDistinctBranchesIncrementalGrouping(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error)
 	GetBrowsingStateNonDistinctBranchesDeduplicatedSingles(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error)
+	GetBrowsingStateNonDistinctBranchesFull(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error)
 	// Other
 	ResetDatabase(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 }
@@ -666,6 +668,25 @@ func (c *dataLoaderClient) GetBrowsingStateNonDistinctBranchesDeduplicatedSingle
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type DataLoader_GetBrowsingStateNonDistinctBranchesDeduplicatedSinglesClient = grpc.ServerStreamingClient[BrowsingStateResponse]
 
+func (c *dataLoaderClient) GetBrowsingStateNonDistinctBranchesFull(ctx context.Context, in *GetBrowsingStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BrowsingStateResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &DataLoader_ServiceDesc.Streams[19], DataLoader_GetBrowsingStateNonDistinctBranchesFull_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[GetBrowsingStateRequest, BrowsingStateResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetBrowsingStateNonDistinctBranchesFullClient = grpc.ServerStreamingClient[BrowsingStateResponse]
+
 func (c *dataLoaderClient) ResetDatabase(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Empty)
@@ -732,6 +753,7 @@ type DataLoaderServer interface {
 	GetBrowsingStateDistinctBranchesFull(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error
 	GetBrowsingStateDistinctBranchesIncrementalGrouping(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error
 	GetBrowsingStateNonDistinctBranchesDeduplicatedSingles(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error
+	GetBrowsingStateNonDistinctBranchesFull(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error
 	// Other
 	ResetDatabase(context.Context, *Empty) (*Empty, error)
 	mustEmbedUnimplementedDataLoaderServer()
@@ -860,6 +882,9 @@ func (UnimplementedDataLoaderServer) GetBrowsingStateDistinctBranchesIncremental
 }
 func (UnimplementedDataLoaderServer) GetBrowsingStateNonDistinctBranchesDeduplicatedSingles(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method GetBrowsingStateNonDistinctBranchesDeduplicatedSingles not implemented")
+}
+func (UnimplementedDataLoaderServer) GetBrowsingStateNonDistinctBranchesFull(*GetBrowsingStateRequest, grpc.ServerStreamingServer[BrowsingStateResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method GetBrowsingStateNonDistinctBranchesFull not implemented")
 }
 func (UnimplementedDataLoaderServer) ResetDatabase(context.Context, *Empty) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ResetDatabase not implemented")
@@ -1438,6 +1463,17 @@ func _DataLoader_GetBrowsingStateNonDistinctBranchesDeduplicatedSingles_Handler(
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type DataLoader_GetBrowsingStateNonDistinctBranchesDeduplicatedSinglesServer = grpc.ServerStreamingServer[BrowsingStateResponse]
 
+func _DataLoader_GetBrowsingStateNonDistinctBranchesFull_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetBrowsingStateRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DataLoaderServer).GetBrowsingStateNonDistinctBranchesFull(m, &grpc.GenericServerStream[GetBrowsingStateRequest, BrowsingStateResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DataLoader_GetBrowsingStateNonDistinctBranchesFullServer = grpc.ServerStreamingServer[BrowsingStateResponse]
+
 func _DataLoader_ResetDatabase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
@@ -1646,6 +1682,11 @@ var DataLoader_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "getBrowsingStateNonDistinctBranchesDeduplicatedSingles",
 			Handler:       _DataLoader_GetBrowsingStateNonDistinctBranchesDeduplicatedSingles_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "getBrowsingStateNonDistinctBranchesFull",
+			Handler:       _DataLoader_GetBrowsingStateNonDistinctBranchesFull_Handler,
 			ServerStreams: true,
 		},
 	},

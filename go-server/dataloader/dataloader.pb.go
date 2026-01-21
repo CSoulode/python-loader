@@ -3738,7 +3738,7 @@ const file_dataloader_proto_rawDesc = "" +
 	"\n" +
 	"\x06Z_AXIS\x10\x02\x12\n" +
 	"\n" +
-	"\x06FILTER\x10\x032\x9e\x1a\n" +
+	"\x06FILTER\x10\x032\x95\x1b\n" +
 	"\n" +
 	"DataLoader\x12Q\n" +
 	"\tgetMedias\x12\x1c.dataloader.GetMediasRequest\x1a\".dataloader.StreamingMediaResponse\"\x000\x01\x12:\n" +
@@ -3782,7 +3782,8 @@ const file_dataloader_proto_rawDesc = "" +
 	"*getBrowsingStateNonDistinctBranchesSingles\x12#.dataloader.GetBrowsingStateRequest\x1a!.dataloader.BrowsingStateResponse\"\x000\x01\x12r\n" +
 	"$getBrowsingStateDistinctBranchesFull\x12#.dataloader.GetBrowsingStateRequest\x1a!.dataloader.BrowsingStateResponse\"\x000\x01\x12\x81\x01\n" +
 	"3getBrowsingStateDistinctBranchesIncrementalGrouping\x12#.dataloader.GetBrowsingStateRequest\x1a!.dataloader.BrowsingStateResponse\"\x000\x01\x12\x84\x01\n" +
-	"6getBrowsingStateNonDistinctBranchesDeduplicatedSingles\x12#.dataloader.GetBrowsingStateRequest\x1a!.dataloader.BrowsingStateResponse\"\x000\x01\x127\n" +
+	"6getBrowsingStateNonDistinctBranchesDeduplicatedSingles\x12#.dataloader.GetBrowsingStateRequest\x1a!.dataloader.BrowsingStateResponse\"\x000\x01\x12u\n" +
+	"'getBrowsingStateNonDistinctBranchesFull\x12#.dataloader.GetBrowsingStateRequest\x1a!.dataloader.BrowsingStateResponse\"\x000\x01\x127\n" +
 	"\rresetDatabase\x12\x11.dataloader.Empty\x1a\x11.dataloader.Empty\"\x00B\x1aZ\x18m3.dataloader/dataloaderb\x06proto3"
 
 var (
@@ -3945,49 +3946,51 @@ var file_dataloader_proto_depIdxs = []int32{
 	45, // 87: dataloader.DataLoader.getBrowsingStateDistinctBranchesFull:input_type -> dataloader.GetBrowsingStateRequest
 	45, // 88: dataloader.DataLoader.getBrowsingStateDistinctBranchesIncrementalGrouping:input_type -> dataloader.GetBrowsingStateRequest
 	45, // 89: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesDeduplicatedSingles:input_type -> dataloader.GetBrowsingStateRequest
-	2,  // 90: dataloader.DataLoader.resetDatabase:input_type -> dataloader.Empty
-	9,  // 91: dataloader.DataLoader.getMedias:output_type -> dataloader.StreamingMediaResponse
-	6,  // 92: dataloader.DataLoader.getMediaById:output_type -> dataloader.Media
-	6,  // 93: dataloader.DataLoader.getMediaByURI:output_type -> dataloader.Media
-	6,  // 94: dataloader.DataLoader.createMedia:output_type -> dataloader.Media
-	10, // 95: dataloader.DataLoader.createMediaStream:output_type -> dataloader.CreateMediaStreamResponse
-	2,  // 96: dataloader.DataLoader.deleteMedia:output_type -> dataloader.Empty
-	15, // 97: dataloader.DataLoader.getTagSets:output_type -> dataloader.StreamingTagSetResponse
-	11, // 98: dataloader.DataLoader.getTagSetById:output_type -> dataloader.TagSet
-	16, // 99: dataloader.DataLoader.getTagSetsById:output_type -> dataloader.TagSetsResponse
-	11, // 100: dataloader.DataLoader.getTagSetByName:output_type -> dataloader.TagSet
-	11, // 101: dataloader.DataLoader.createTagSet:output_type -> dataloader.TagSet
-	26, // 102: dataloader.DataLoader.getTags:output_type -> dataloader.StreamingTagResponse
-	17, // 103: dataloader.DataLoader.getTag:output_type -> dataloader.Tag
-	17, // 104: dataloader.DataLoader.createTag:output_type -> dataloader.Tag
-	28, // 105: dataloader.DataLoader.createTagStream:output_type -> dataloader.CreateTagStreamResponse
-	2,  // 106: dataloader.DataLoader.changeTagName:output_type -> dataloader.Empty
-	32, // 107: dataloader.DataLoader.getTaggings:output_type -> dataloader.StreamingTaggingResponse
-	5,  // 108: dataloader.DataLoader.getMediasWithTag:output_type -> dataloader.RepeatedIdResponse
-	5,  // 109: dataloader.DataLoader.getMediaTags:output_type -> dataloader.RepeatedIdResponse
-	30, // 110: dataloader.DataLoader.createTagging:output_type -> dataloader.Tagging
-	33, // 111: dataloader.DataLoader.createTaggingStream:output_type -> dataloader.CreateTaggingStreamResponse
-	2,  // 112: dataloader.DataLoader.changeTagging:output_type -> dataloader.Empty
-	38, // 113: dataloader.DataLoader.getHierarchies:output_type -> dataloader.StreamingHierarchyResponse
-	35, // 114: dataloader.DataLoader.getHierarchy:output_type -> dataloader.Hierarchy
-	35, // 115: dataloader.DataLoader.createHierarchy:output_type -> dataloader.Hierarchy
-	42, // 116: dataloader.DataLoader.getNodes:output_type -> dataloader.StreamingNodeResponse
-	39, // 117: dataloader.DataLoader.getNode:output_type -> dataloader.Node
-	43, // 118: dataloader.DataLoader.getChildNodes:output_type -> dataloader.ChildNodeResponse
-	39, // 119: dataloader.DataLoader.createNode:output_type -> dataloader.Node
-	42, // 120: dataloader.DataLoader.createNodeStream:output_type -> dataloader.StreamingNodeResponse
-	2,  // 121: dataloader.DataLoader.deleteNode:output_type -> dataloader.Empty
-	47, // 122: dataloader.DataLoader.getCell:output_type -> dataloader.BrowsingStateResponse
-	47, // 123: dataloader.DataLoader.getBrowsingState:output_type -> dataloader.BrowsingStateResponse
-	47, // 124: dataloader.DataLoader.getBrowsingState2:output_type -> dataloader.BrowsingStateResponse
-	47, // 125: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesIncrementalGrouping:output_type -> dataloader.BrowsingStateResponse
-	47, // 126: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesSingles:output_type -> dataloader.BrowsingStateResponse
-	47, // 127: dataloader.DataLoader.getBrowsingStateDistinctBranchesFull:output_type -> dataloader.BrowsingStateResponse
-	47, // 128: dataloader.DataLoader.getBrowsingStateDistinctBranchesIncrementalGrouping:output_type -> dataloader.BrowsingStateResponse
-	47, // 129: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesDeduplicatedSingles:output_type -> dataloader.BrowsingStateResponse
-	2,  // 130: dataloader.DataLoader.resetDatabase:output_type -> dataloader.Empty
-	91, // [91:131] is the sub-list for method output_type
-	51, // [51:91] is the sub-list for method input_type
+	45, // 90: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesFull:input_type -> dataloader.GetBrowsingStateRequest
+	2,  // 91: dataloader.DataLoader.resetDatabase:input_type -> dataloader.Empty
+	9,  // 92: dataloader.DataLoader.getMedias:output_type -> dataloader.StreamingMediaResponse
+	6,  // 93: dataloader.DataLoader.getMediaById:output_type -> dataloader.Media
+	6,  // 94: dataloader.DataLoader.getMediaByURI:output_type -> dataloader.Media
+	6,  // 95: dataloader.DataLoader.createMedia:output_type -> dataloader.Media
+	10, // 96: dataloader.DataLoader.createMediaStream:output_type -> dataloader.CreateMediaStreamResponse
+	2,  // 97: dataloader.DataLoader.deleteMedia:output_type -> dataloader.Empty
+	15, // 98: dataloader.DataLoader.getTagSets:output_type -> dataloader.StreamingTagSetResponse
+	11, // 99: dataloader.DataLoader.getTagSetById:output_type -> dataloader.TagSet
+	16, // 100: dataloader.DataLoader.getTagSetsById:output_type -> dataloader.TagSetsResponse
+	11, // 101: dataloader.DataLoader.getTagSetByName:output_type -> dataloader.TagSet
+	11, // 102: dataloader.DataLoader.createTagSet:output_type -> dataloader.TagSet
+	26, // 103: dataloader.DataLoader.getTags:output_type -> dataloader.StreamingTagResponse
+	17, // 104: dataloader.DataLoader.getTag:output_type -> dataloader.Tag
+	17, // 105: dataloader.DataLoader.createTag:output_type -> dataloader.Tag
+	28, // 106: dataloader.DataLoader.createTagStream:output_type -> dataloader.CreateTagStreamResponse
+	2,  // 107: dataloader.DataLoader.changeTagName:output_type -> dataloader.Empty
+	32, // 108: dataloader.DataLoader.getTaggings:output_type -> dataloader.StreamingTaggingResponse
+	5,  // 109: dataloader.DataLoader.getMediasWithTag:output_type -> dataloader.RepeatedIdResponse
+	5,  // 110: dataloader.DataLoader.getMediaTags:output_type -> dataloader.RepeatedIdResponse
+	30, // 111: dataloader.DataLoader.createTagging:output_type -> dataloader.Tagging
+	33, // 112: dataloader.DataLoader.createTaggingStream:output_type -> dataloader.CreateTaggingStreamResponse
+	2,  // 113: dataloader.DataLoader.changeTagging:output_type -> dataloader.Empty
+	38, // 114: dataloader.DataLoader.getHierarchies:output_type -> dataloader.StreamingHierarchyResponse
+	35, // 115: dataloader.DataLoader.getHierarchy:output_type -> dataloader.Hierarchy
+	35, // 116: dataloader.DataLoader.createHierarchy:output_type -> dataloader.Hierarchy
+	42, // 117: dataloader.DataLoader.getNodes:output_type -> dataloader.StreamingNodeResponse
+	39, // 118: dataloader.DataLoader.getNode:output_type -> dataloader.Node
+	43, // 119: dataloader.DataLoader.getChildNodes:output_type -> dataloader.ChildNodeResponse
+	39, // 120: dataloader.DataLoader.createNode:output_type -> dataloader.Node
+	42, // 121: dataloader.DataLoader.createNodeStream:output_type -> dataloader.StreamingNodeResponse
+	2,  // 122: dataloader.DataLoader.deleteNode:output_type -> dataloader.Empty
+	47, // 123: dataloader.DataLoader.getCell:output_type -> dataloader.BrowsingStateResponse
+	47, // 124: dataloader.DataLoader.getBrowsingState:output_type -> dataloader.BrowsingStateResponse
+	47, // 125: dataloader.DataLoader.getBrowsingState2:output_type -> dataloader.BrowsingStateResponse
+	47, // 126: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesIncrementalGrouping:output_type -> dataloader.BrowsingStateResponse
+	47, // 127: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesSingles:output_type -> dataloader.BrowsingStateResponse
+	47, // 128: dataloader.DataLoader.getBrowsingStateDistinctBranchesFull:output_type -> dataloader.BrowsingStateResponse
+	47, // 129: dataloader.DataLoader.getBrowsingStateDistinctBranchesIncrementalGrouping:output_type -> dataloader.BrowsingStateResponse
+	47, // 130: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesDeduplicatedSingles:output_type -> dataloader.BrowsingStateResponse
+	47, // 131: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesFull:output_type -> dataloader.BrowsingStateResponse
+	2,  // 132: dataloader.DataLoader.resetDatabase:output_type -> dataloader.Empty
+	92, // [92:133] is the sub-list for method output_type
+	51, // [51:92] is the sub-list for method input_type
 	51, // [51:51] is the sub-list for extension type_name
 	51, // [51:51] is the sub-list for extension extendee
 	0,  // [0:51] is the sub-list for field type_name
