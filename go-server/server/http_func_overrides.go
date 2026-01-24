@@ -34,6 +34,8 @@ func GetBrowsingStateHandler(client pb.DataLoaderClient) http.HandlerFunc {
 			switch valueTypeString {
 			case "node":
 				return pb.FilterValueType_NODE
+			case "tagset":
+				return pb.FilterValueType_TAGSET
 			case "tag":
 				return pb.FilterValueType_TAG
 			case "daterange":
@@ -55,21 +57,23 @@ func GetBrowsingStateHandler(client pb.DataLoaderClient) http.HandlerFunc {
 			Timeline: req.Timeline,
 		}
 
-		newReq.Filters[0] = &pb.AxisFilter{
-			AxisFilterType: pb.AxisType_X_AXIS,
-			Value:          int32(utilities.ConditionalAssignInt(axisX.Id != -1, axisX.Id, -1)),
-			ValueType:      getValueType(axisX.Type),
-		}
-		newReq.Filters[1] = &pb.AxisFilter{
-			AxisFilterType: pb.AxisType_Y_AXIS,
-			Value:          int32(utilities.ConditionalAssignInt(axisY.Id != -1, axisY.Id, -1)),
-			ValueType:      getValueType(axisY.Type),
-		}
-		newReq.Filters[2] = &pb.AxisFilter{
-			AxisFilterType: pb.AxisType_Z_AXIS,
-			Value:          int32(utilities.ConditionalAssignInt(axisZ.Id != -1, axisZ.Id, -1)),
-			ValueType:      getValueType(axisZ.Type),
-		}
+		newReq.Filters = append(newReq.Filters,
+			&pb.AxisFilter{
+				AxisFilterType: pb.AxisType_X_AXIS,
+				Value:          int32(utilities.ConditionalAssignInt(axisX.Id != -1, axisX.Id, -1)),
+				ValueType:      getValueType(axisX.Type),
+			},
+			&pb.AxisFilter{
+				AxisFilterType: pb.AxisType_Y_AXIS,
+				Value:          int32(utilities.ConditionalAssignInt(axisY.Id != -1, axisY.Id, -1)),
+				ValueType:      getValueType(axisY.Type),
+			},
+			&pb.AxisFilter{
+				AxisFilterType: pb.AxisType_Z_AXIS,
+				Value:          int32(utilities.ConditionalAssignInt(axisZ.Id != -1, axisZ.Id, -1)),
+				ValueType:      getValueType(axisZ.Type),
+			},
+		)
 
 		for _, f := range filters {
 			for _, i := range f.Ids {
@@ -81,7 +85,7 @@ func GetBrowsingStateHandler(client pb.DataLoaderClient) http.HandlerFunc {
 			}
 		}
 
-		stream, err := client.GetBrowsingState(r.Context(), newReq)
+		stream, err := client.GetBrowsingState2(r.Context(), newReq)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("rpc error: %v", err), http.StatusBadGateway)
 			return

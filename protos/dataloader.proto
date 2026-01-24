@@ -80,7 +80,7 @@ service DataLoader {
 
   rpc getCell (GetCellRequest) returns (stream BrowsingStateResponse) {
     option (google.api.http) = {
-      get: "/api/getCell"  // Maintain old endpoint for compatibility
+      get: "/api/cell"  // Maintain old endpoint for compatibility
     };
   };
 

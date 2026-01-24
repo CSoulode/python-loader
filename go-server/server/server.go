@@ -432,7 +432,8 @@ func main() {
 	// Custom handlers for specific endpoints
 	httpMux.HandleFunc("/api/tagset", GetTagsetsHandler(client))
 	httpMux.HandleFunc("/api/node/{parentId}/children", GetChildNodesHandler(client))
-	httpMux.HandleFunc("/api/getCell", GetBrowsingStateHandler(client))
+	httpMux.HandleFunc("/api/cell", GetBrowsingStateHandler(client))
+	httpMux.HandleFunc("/api/cell/", GetBrowsingStateHandler(client))
 
 	// 5) Fallback to the generated gateway for everything else
 	httpMux.Handle("/", gwMux)

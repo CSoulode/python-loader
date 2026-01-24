@@ -1809,7 +1809,7 @@ func (s *DataLoaderServer) GetBrowsingState(req *pb.GetBrowsingStateRequest, str
 	return nil
 }
 
-func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, stream pb.DataLoader_GetBrowsingStateServer) error {
+func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, stream pb.DataLoader_GetBrowsingState2Server) error {
 	ctx := stream.Context()
 
 	// ---------- Parse request params ----------

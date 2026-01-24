@@ -3738,7 +3738,7 @@ const file_dataloader_proto_rawDesc = "" +
 	"\n" +
 	"\x06Z_AXIS\x10\x02\x12\n" +
 	"\n" +
-	"\x06FILTER\x10\x032\x95\x1b\n" +
+	"\x06FILTER\x10\x032\x92\x1b\n" +
 	"\n" +
 	"DataLoader\x12Q\n" +
 	"\tgetMedias\x12\x1c.dataloader.GetMediasRequest\x1a\".dataloader.StreamingMediaResponse\"\x000\x01\x12:\n" +
@@ -3774,8 +3774,8 @@ const file_dataloader_proto_rawDesc = "" +
 	"createNode\x12\x1d.dataloader.CreateNodeRequest\x1a\x10.dataloader.Node\"\x00\x12Z\n" +
 	"\x10createNodeStream\x12\x1d.dataloader.CreateNodeRequest\x1a!.dataloader.StreamingNodeResponse\"\x00(\x010\x01\x128\n" +
 	"\n" +
-	"deleteNode\x12\x15.dataloader.IdRequest\x1a\x11.dataloader.Empty\"\x00\x12`\n" +
-	"\agetCell\x12\x1a.dataloader.GetCellRequest\x1a!.dataloader.BrowsingStateResponse\"\x14\x82\xd3\xe4\x93\x02\x0e\x12\f/api/getCell0\x01\x12^\n" +
+	"deleteNode\x12\x15.dataloader.IdRequest\x1a\x11.dataloader.Empty\"\x00\x12]\n" +
+	"\agetCell\x12\x1a.dataloader.GetCellRequest\x1a!.dataloader.BrowsingStateResponse\"\x11\x82\xd3\xe4\x93\x02\v\x12\t/api/cell0\x01\x12^\n" +
 	"\x10getBrowsingState\x12#.dataloader.GetBrowsingStateRequest\x1a!.dataloader.BrowsingStateResponse\"\x000\x01\x12_\n" +
 	"\x11getBrowsingState2\x12#.dataloader.GetBrowsingStateRequest\x1a!.dataloader.BrowsingStateResponse\"\x000\x01\x12\x84\x01\n" +
 	"6getBrowsingStateNonDistinctBranchesIncrementalGrouping\x12#.dataloader.GetBrowsingStateRequest\x1a!.dataloader.BrowsingStateResponse\"\x000\x01\x12x\n" +
