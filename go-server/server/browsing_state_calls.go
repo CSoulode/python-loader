@@ -60,6 +60,7 @@ var (
 	sqlTraceOn          bool
 	sqlTraceLogger      *log.Logger
 	disableHashJoins    = utilities.MustGetEnv("UNGROUPED_QUERY_DISABLE_HASH_JOIN") == "1"
+	forceJoinOrders     = utilities.MustGetEnv("UNGROUPED_QUERY_FORCE_JOIN_ORDERS") == "1"
 	useLateralMediaJoin = utilities.MustGetEnv("UNGROUPED_QUERY_USE_LATERAL_MEDIA_JOIN") == "1"
 )
 
@@ -530,7 +531,10 @@ func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesIncrementalGrouping(
 		axisY.Type, axisY.Id,
 		axisZ.Type, axisZ.Id,
 		filters,
-		qg.UngroupedOpts{BranchDistinct: true},
+		qg.UngroupedOpts{
+			BranchDistinct:      true,
+			UseLateralMediaJoin: useLateralMediaJoin,
+		},
 	)
 	if sqlStr == "" {
 		sqlStr = `select 1 as x_id, 1 as y_id, 1 as z_id, O.id as object_id, O.file_uri, O.thumbnail_uri from medias O;`
@@ -711,7 +715,10 @@ func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesFull(
 		axisY.Type, axisY.Id,
 		axisZ.Type, axisZ.Id,
 		filters,
-		qg.UngroupedOpts{BranchDistinct: true},
+		qg.UngroupedOpts{
+			BranchDistinct:      true,
+			UseLateralMediaJoin: useLateralMediaJoin,
+		},
 	)
 	if sqlStr == "" {
 		sqlStr = `select 1 as x_id, 1 as y_id, 1 as z_id, O.id as object_id, O.file_uri, O.thumbnail_uri from medias O;`
@@ -931,6 +938,10 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesSingles(
 		axisY.Type, axisY.Id,
 		axisZ.Type, axisZ.Id,
 		filters,
+		qg.UngroupedOpts{
+			BranchDistinct:      false,
+			UseLateralMediaJoin: useLateralMediaJoin,
+		},
 	)
 	if sqlStr == "" {
 		sqlStr = `select 1 as x_id, 1 as y_id, 1 as z_id, O.id as object_id, O.file_uri, O.thumbnail_uri from medias O;`
@@ -1086,6 +1097,10 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesDeduplicatedSingle
 		axisY.Type, axisY.Id,
 		axisZ.Type, axisZ.Id,
 		filters,
+		qg.UngroupedOpts{
+			BranchDistinct:      false,
+			UseLateralMediaJoin: useLateralMediaJoin,
+		},
 	)
 	if sqlStr == "" {
 		sqlStr = `select 1 as x_id, 1 as y_id, 1 as z_id, O.id as object_id, O.file_uri, O.thumbnail_uri from medias O;`
@@ -1567,6 +1582,12 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesIncrementalGroupin
 	if disableHashJoins {
 		if _, err := tx.ExecContext(ctx, "SET LOCAL enable_hashjoin = off"); err != nil {
 			return fmt.Errorf("GetBrowsingStateNonDistinctBranchesIncrementalGrouping set enable_hashjoin=off: %w", err)
+		}
+	}
+
+	if forceJoinOrders {
+		if _, err := tx.ExecContext(ctx, "SET LOCAL join_collapse_limit = 1"); err != nil {
+			return fmt.Errorf("GetBrowsingStateNonDistinctBranchesIncrementalGrouping set join_collapse_limit=1: %w", err)
 		}
 	}
 
