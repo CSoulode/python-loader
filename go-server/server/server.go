@@ -418,22 +418,23 @@ func main() {
 		log.Fatalf("failed to dial gRPC server: %v", err)
 	}
 	defer grpcConn.Close()
-	client := pb.NewDataLoaderClient(grpcConn)
 
 	gwMux := runtime.NewServeMux()
-	if err := pb.RegisterDataLoaderHandlerFromEndpoint(context.Background(), gwMux, grpcAddr,
-		[]grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
-	); err != nil {
+	if err := pb.RegisterDataLoaderHandler(context.Background(), gwMux, grpcConn); err != nil {
 		log.Fatalf("failed to register HTTP gateway: %v", err)
 	}
 
 	httpMux := http.NewServeMux()
 
-	// Custom handlers for specific endpoints
-	httpMux.HandleFunc("/api/tagset", GetTagsetsHandler(client))
-	httpMux.HandleFunc("/api/node/{parentId}/children", GetChildNodesHandler(client))
-	httpMux.HandleFunc("/api/cell", GetBrowsingStateHandler(client))
-	httpMux.HandleFunc("/api/cell/", GetBrowsingStateHandler(client))
+	// Custom handlers for MetaDataCube-Client_2024 compatibility (C#-style REST shapes).
+	httpMux.HandleFunc("/api/tagset", GetMetaDataCubeCompatTagsetsHandler(server.db))
+	httpMux.HandleFunc("/api/tagset/{id}", GetMetaDataCubeCompatTagsetDetailHandler(server.db))
+	httpMux.HandleFunc("/api/hierarchy/{id}", GetMetaDataCubeCompatHierarchyHandler(server.db))
+	httpMux.HandleFunc("/api/node/{id}/children", GetMetaDataCubeCompatNodeChildrenHandler(server.db))
+	httpMux.HandleFunc("/api/node/{id}/Children", GetMetaDataCubeCompatNodeChildrenHandler(server.db))
+	httpMux.HandleFunc("/api/cubeobject/{id}/tags", GetMetaDataCubeCompatCubeObjectTagsHandler(server.db))
+	httpMux.HandleFunc("/api/cell", GetMetaDataCubeCompatCellHandler(server.db))
+	httpMux.HandleFunc("/api/cell/", GetMetaDataCubeCompatCellHandler(server.db))
 
 	// 5) Fallback to the generated gateway for everything else
 	httpMux.Handle("/", gwMux)

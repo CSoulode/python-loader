@@ -14,7 +14,8 @@
   "runArgs": [
     "--publish", "50051:50051",
     "--publish", "8080:8080",
-    "--env-file", ".devcontainer/devcontainer.env"
+    "--env-file", ".devcontainer/devcontainer.env",
+    "--network", "emm_cube_small_default" 
   ],
 
   "customizations": {
@@ -24,7 +25,7 @@
       },
       "extensions": [
         "golang.Go",
-        "zxh404.vscode-proto3"
+        "drblury.protobuf-vsc"
       ]
     }
   }

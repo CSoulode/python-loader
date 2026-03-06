@@ -14,5 +14,8 @@ server/vbs_loader
 client/python-loader-client
 go-server/out/server/server
 go-server/out/sql-logs/*
+go-server/out/*logs
 
-go-server/server/__debug_bin305354089
+go-server/server/__debug*
+
+.codex/

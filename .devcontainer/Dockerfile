@@ -1,5 +1,5 @@
 # 1. Base off Microsoft’s Go Dev Container image (includes Go, gopls, dlv)
-FROM mcr.microsoft.com/vscode/devcontainers/go:1-1.24-bullseye
+FROM mcr.microsoft.com/vscode/devcontainers/go
 
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest

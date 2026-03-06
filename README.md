@@ -2,10 +2,23 @@
 
 This project is part of M3 Multi-Dimensional Data Model. It enables loading and exporting data to a postgres database from json files. This builds the database following the data model defined in order to be later visualized and explored using other tools.
 
+> Note: This README is known to be partially outdated (e.g. Docker usage, Go HTTP gateway, browsing-state optimizations, plugin pipeline).  
+> For a more accurate, detailed “what this repo currently does” document, see `docs/PROJECT_EXPLANATION.zh-CN.md`.
+
+## Vector search (vectorkv)
+
+This repo now includes a separate Vector KV Store in `vectorkv/` that:
+
+- Stores embeddings as **M³ vector tags** (`tags` → `<model>_tags` → `taggings`)
+- Serves NN/KNN queries over gRPC (`kvstore.v1.VectorKV`)
+- Supports **multiple models** per server (via `vectorkv/config/models.json`)
+
+See `vectorkv/README.md` for setup/commands and `docs/vector_support_design.md` for the database design.
+
 ## Requirements
 
 - Python 3.10.11 or higher
-- PostgreSQL 15
+- PostgreSQL (pgvector extension required for vector search)
 - Go 
 
 Docker is currently not used on this project.
