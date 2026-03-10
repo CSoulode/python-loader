@@ -2,6 +2,8 @@
 
 This project is part of M3 Multi-Dimensional Data Model. It enables loading and exporting data to a postgres database from json files. This builds the database following the data model defined in order to be later visualized and explored using other tools.
 
+> Current workspace note: for the real multi-repo startup path used in this workspace (`vectorkv` + `python-loader/go-server` + `MetaDataCube-Client_2024` + `server_media.py`), read `../docs/architecture/workspace_runtime.md` first. Parts of this README remain historical.
+>
 > Note: This README is known to be partially outdated (e.g. Docker usage, Go HTTP gateway, browsing-state optimizations, plugin pipeline).  
 > For a more accurate, detailed “what this repo currently does” document, see `docs/PROJECT_EXPLANATION.zh-CN.md`.
 
