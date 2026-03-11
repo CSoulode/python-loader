@@ -554,7 +554,35 @@ func GetMetaDataCubeCompatCubeObjectTagsHandler(db *sql.DB) http.HandlerFunc {
 
 func objectIDBranchSQL(axisType string, ids []int) (string, error) {
 	if len(ids) == 0 {
+		if axisType == "objectid" {
+			return "SELECT O.id AS object_id FROM public.medias O WHERE 1 = 0", nil
+		}
 		return "", nil
+	}
+	if axisType == "objectid" {
+		if len(ids) <= 1000 {
+			var b strings.Builder
+			b.WriteString("SELECT unnest(ARRAY[")
+			for i, id := range ids {
+				if i > 0 {
+					b.WriteString(",")
+				}
+				b.WriteString(fmt.Sprint(id))
+			}
+			b.WriteString("]::integer[]) AS object_id")
+			return b.String(), nil
+		}
+
+		var b strings.Builder
+		b.WriteString("SELECT V.object_id FROM (VALUES ")
+		for i, id := range ids {
+			if i > 0 {
+				b.WriteString(",")
+			}
+			b.WriteString(fmt.Sprintf("(%d)", id))
+		}
+		b.WriteString(") AS V(object_id)")
+		return b.String(), nil
 	}
 	if len(ids) == 1 {
 		id := ids[0]
@@ -676,7 +704,7 @@ func buildAllMediasSQL(axisX, axisY, axisZ qg.ParsedAxis, filters []qg.ParsedFil
 
 	for _, f := range filters {
 		switch f.Type {
-		case "node", "tagset", "tag":
+		case "node", "tagset", "tag", "objectid":
 			branch, err := objectIDBranchSQL(f.Type, f.Ids)
 			if err != nil {
 				return "", err
@@ -775,7 +803,7 @@ func queryAllMedias(ctx context.Context, db *sql.DB, axisX, axisY, axisZ qg.Pars
 // GetMetaDataCubeCompatCellHandler serves GET /api/cell and /api/cell/.
 // - If `all` is set (client uses `all=[]`): returns a flat array of media objects: [{id,fileURI,thumbnailURI},...]
 // - Otherwise: returns browsing state cells: [{x,y,z,count,cubeObjects:[{...}]}...]
-func GetMetaDataCubeCompatCellHandler(db *sql.DB) http.HandlerFunc {
+func GetMetaDataCubeCompatCellHandler(db *sql.DB, vectorFilters *vectorFilterResolver) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -795,6 +823,20 @@ func GetMetaDataCubeCompatCellHandler(db *sql.DB) http.HandlerFunc {
 		if err != nil {
 			http.Error(w, fmt.Sprintf("invalid parameters: %v", err), http.StatusBadRequest)
 			return
+		}
+
+		vectorFilterCfg, err := parseCompatVectorFilter(r.URL.Query().Get("vectorFilter"))
+		if err != nil {
+			http.Error(w, vectorFilterHTTPMessage(err), mapVectorFilterHTTPStatus(err))
+			return
+		}
+		if vectorFilterCfg != nil {
+			vectorIDs, err := vectorFilters.ResolveObjectIDs(r.Context(), vectorFilterCfg)
+			if err != nil {
+				http.Error(w, vectorFilterHTTPMessage(err), mapVectorFilterHTTPStatus(err))
+				return
+			}
+			filters = appendVectorObjectIDFilter(filters, vectorIDs, true)
 		}
 
 		// `all` mode: return flat list of medias (do not depend on Timestamp UTC tagset).

@@ -96,7 +96,7 @@ func (s *DataLoaderServer) GetTagSetsById(ctx context.Context, request *pb.IdReq
 		return nil, status.Errorf(codes.Internal, "query tags failed: %v", err)
 	}
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to execute query: %w", err)
+		return nil, status.Errorf(codes.Internal, "failed to execute query: %v", err)
 	}
 
 	tagRows, err := s.db.QueryContext(ctx, `

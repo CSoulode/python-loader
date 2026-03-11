@@ -390,10 +390,29 @@ message GetCellRequest { //DEPRICATED for http backwards compatibility only
   string timeline = 6;
 }
 
+message Vector {
+  repeated float values = 1 [packed = true];
+}
+
+message VectorReference {
+  oneof ref {
+    int32 object_id = 1;
+    Vector raw_embedding = 2;
+  }
+}
+
+message VectorFilterConfig {
+  string model_name = 1;
+  VectorReference reference = 2;
+  int32 k = 3;
+  float max_distance = 4;
+}
+
 message GetBrowsingStateRequest {
   repeated AxisFilter filters = 1;
   string all = 2;
   string timeline = 3;
+  VectorFilterConfig vector_filter = 4;
 }
 
 enum FilterValueType {
@@ -406,6 +425,7 @@ enum FilterValueType {
   DATERANGE = 6;
   TIMERANGE = 7;
   TIMESTAMPRANGE = 8;
+  VECTOR_FILTER = 9;
 }
 
 enum AxisType {

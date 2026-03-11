@@ -511,7 +511,7 @@ func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesIncrementalGrouping(
 	ctx := stream.Context()
 
 	// ---------- Parse request params ----------
-	axisOrder, axisX, axisY, axisZ, filters, err := parseAxesAndFilters(req)
+	axisOrder, axisX, axisY, axisZ, filters, err := s.parseBrowsingStateRequest(ctx, req)
 	if axisOrder == nil {
 		return fmt.Errorf("invalid axis filter order")
 	}
@@ -695,7 +695,7 @@ func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesFull(
 ) error {
 	ctx := stream.Context()
 	// ---------- Parse request params ----------
-	axisOrder, axisX, axisY, axisZ, filters, err := parseAxesAndFilters(req)
+	axisOrder, axisX, axisY, axisZ, filters, err := s.parseBrowsingStateRequest(ctx, req)
 	if axisOrder == nil {
 		return fmt.Errorf("invalid axis filter order")
 	}
@@ -920,7 +920,7 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesSingles(
 ) error {
 	ctx := stream.Context()
 
-	axisOrder, axisX, axisY, axisZ, filters, err := parseAxesAndFilters(req)
+	axisOrder, axisX, axisY, axisZ, filters, err := s.parseBrowsingStateRequest(ctx, req)
 	if axisOrder == nil {
 		return fmt.Errorf("invalid axis filter order")
 	}
@@ -1079,7 +1079,7 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesDeduplicatedSingle
 	// - true:  dedup in sender goroutine (interesting for comparison / backpressure evidence)
 	dedupInSender := false
 
-	axisOrder, axisX, axisY, axisZ, filters, err := parseAxesAndFilters(req)
+	axisOrder, axisX, axisY, axisZ, filters, err := s.parseBrowsingStateRequest(ctx, req)
 	if axisOrder == nil {
 		return fmt.Errorf("invalid axis filter order")
 	}
@@ -1311,7 +1311,7 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesFull(
 	ctx := stream.Context()
 
 	// ---------- Parse request params ----------
-	axisOrder, axisX, axisY, axisZ, filters, err := parseAxesAndFilters(req)
+	axisOrder, axisX, axisY, axisZ, filters, err := s.parseBrowsingStateRequest(ctx, req)
 	if axisOrder == nil {
 		return fmt.Errorf("invalid axis filter order")
 	}
@@ -1539,7 +1539,7 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesIncrementalGroupin
 ) error {
 	ctx := stream.Context()
 
-	axisOrder, axisX, axisY, axisZ, filters, err := parseAxesAndFilters(req)
+	axisOrder, axisX, axisY, axisZ, filters, err := s.parseBrowsingStateRequest(ctx, req)
 	if axisOrder == nil {
 		return fmt.Errorf("invalid axis filter order")
 	}
@@ -1717,7 +1717,7 @@ scanLoop:
 
 func (s *DataLoaderServer) GetBrowsingState(req *pb.GetBrowsingStateRequest, stream pb.DataLoader_GetBrowsingStateServer) error {
 	// ---------- Parse request params ----------
-	axisOrder, axisX, axisY, axisZ, filters, err := parseAxesAndFilters(req)
+	axisOrder, axisX, axisY, axisZ, filters, err := s.parseBrowsingStateRequest(stream.Context(), req)
 
 	if axisOrder == nil {
 		return fmt.Errorf("invalid axis filter order")
@@ -1755,8 +1755,13 @@ func (s *DataLoaderServer) GetBrowsingState(req *pb.GetBrowsingStateRequest, str
 		var cubeObjects []*pb.CubeObject
 		for rows.Next() {
 			c := &pb.CubeObject{}
-			if err := rows.Scan(&c.Id, &c.FileUri, &c.ThumbnailUri); err != nil {
+			var thumb sql.NullString
+			var timelineValue any
+			if err := rows.Scan(&c.Id, &c.FileUri, &thumb, &timelineValue); err != nil {
 				return fmt.Errorf("GetBrowsingState failed to scan row: %w", err)
+			}
+			if thumb.Valid {
+				c.ThumbnailUri = thumb.String
 			}
 			cubeObjects = append(cubeObjects, c)
 		}
@@ -1834,7 +1839,7 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 	ctx := stream.Context()
 
 	// ---------- Parse request params ----------
-	axisOrder, axisX, axisY, axisZ, filters, err := parseAxesAndFilters(req)
+	axisOrder, axisX, axisY, axisZ, filters, err := s.parseBrowsingStateRequest(ctx, req)
 	if axisOrder == nil {
 		return fmt.Errorf("invalid axis filter order")
 	}
@@ -1961,8 +1966,13 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 		var cubeObjects []*pb.CubeObject
 		for rows.Next() {
 			c := &pb.CubeObject{}
-			if err := rows.Scan(&c.Id, &c.FileUri, &c.ThumbnailUri); err != nil {
+			var thumb sql.NullString
+			var timelineValue any
+			if err := rows.Scan(&c.Id, &c.FileUri, &thumb, &timelineValue); err != nil {
 				return finish(fmt.Errorf("GetBrowsingState failed to scan row: %w", err))
+			}
+			if thumb.Valid {
+				c.ThumbnailUri = thumb.String
 			}
 			// Successfully scanned a row
 			atomic.AddInt64(&m.RowsRead, 1)

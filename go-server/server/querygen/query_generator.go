@@ -59,6 +59,35 @@ func addRestrict(alias string) string {
 	return " AND " + alias + ".object_id IN (SELECT object_id FROM f)"
 }
 
+func generateObjectIDFilterSQL(ids []int) string {
+	if len(ids) == 0 {
+		return "SELECT O.id AS object_id\nFROM medias O\nWHERE 1 = 0"
+	}
+	if len(ids) <= 1000 {
+		var b strings.Builder
+		b.WriteString("SELECT unnest(ARRAY[")
+		for i, id := range ids {
+			if i > 0 {
+				b.WriteString(",")
+			}
+			b.WriteString(fmt.Sprintf("%d", id))
+		}
+		b.WriteString("]::integer[]) AS object_id")
+		return b.String()
+	}
+
+	var b strings.Builder
+	b.WriteString("SELECT V.object_id\nFROM (VALUES ")
+	for i, id := range ids {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		b.WriteString(fmt.Sprintf("(%d)", id))
+	}
+	b.WriteString(") AS V(object_id)")
+	return b.String()
+}
+
 // BuildInitializeIdsPlan builds the SQL needed to initialize p.Ids,
 // but does NOT hit the database.
 func (p *ParsedAxis) BuildInitializeIdsPlan() (*InitializeIdsPlan, error) {
@@ -250,6 +279,8 @@ func GenerateUngroupedSQLForState(
 					}
 					branches = append(branches, branch{sql: sql})
 				}
+			case "objectid":
+				branches = append(branches, branch{sql: generateObjectIDFilterSQL(f.Ids)})
 			case "numrange":
 				sql := "SELECT R.object_id\nFROM numerical_tags T\nJOIN taggings R ON T.id = R.tag_id\nWHERE " + generateRangeList(f, "")
 				if inF != "" {
@@ -482,6 +513,8 @@ func BuildStateSQLRestrictedByIDs(
 					sql: fmt.Sprintf("SELECT R.object_id\nFROM taggings R\nWHERE R.tag_id IN %s%s", generateIdList(flt), addRestrict("R")),
 				})
 			}
+		case "objectid":
+			branches = append(branches, br{sql: generateObjectIDFilterSQL(flt.Ids)})
 		case "numrange", "alpharange", "daterange", "timerange", "timestamprange":
 			var tableName, quote string
 			switch flt.Type {
@@ -568,6 +601,9 @@ func BuildFilterIDSQL(filter ParsedFilter) (string, error) {
 			return fmt.Sprintf("SELECT R.object_id FROM taggings R WHERE R.tag_id = %d", filter.Ids[0]), nil
 		}
 		return fmt.Sprintf("SELECT R.object_id FROM taggings R WHERE R.tag_id IN %s", generateIdList(filter)), nil
+
+	case "objectid":
+		return generateObjectIDFilterSQL(filter.Ids), nil
 
 	case "numrange", "alpharange", "daterange", "timerange", "timestamprange":
 		var tableName, quote string
@@ -667,6 +703,8 @@ func GenerateSQLQueryForState(
 				} else if len(f.Ids) > 1 {
 					branches = append(branches, branch{sql: fmt.Sprintf("SELECT R.object_id\nFROM taggings R\nWHERE R.tag_id IN %s", generateIdList(f))})
 				}
+			case "objectid":
+				branches = append(branches, branch{sql: generateObjectIDFilterSQL(f.Ids)})
 			case "numrange":
 				branches = append(branches, branch{sql: fmt.Sprintf("SELECT R.object_id\nFROM numerical_tags T\nJOIN taggings R ON T.id = R.tag_id\nWHERE %s", generateRangeList(f, ""))})
 			case "alpharange":
@@ -797,6 +835,8 @@ func GenerateSQLQueryForCell(
 			} else if len(f.Ids) > 1 {
 				branches = append(branches, fmt.Sprintf("SELECT R.object_id\nFROM taggings R\nWHERE R.tag_id IN %s", generateIdList(f)))
 			}
+		case "objectid":
+			branches = append(branches, generateObjectIDFilterSQL(f.Ids))
 		case "numrange":
 			branches = append(branches, fmt.Sprintf("SELECT R.object_id\nFROM numerical_tags T\nJOIN taggings R ON T.id = R.tag_id\nWHERE %s", generateRangeList(f, "")))
 		case "alpharange":
@@ -822,20 +862,19 @@ func GenerateSQLQueryForCell(
 	}
 
 	mid, _ := prettyJoinChain(tmp)
-	mid = strings.Replace(mid, "\nFROM\n", "\nFROM (\n", 1) // open wrapper
-	mid = mid[:len(mid)-1] + ")\n"                          // close wrapper after chain
 
-	var front, end strings.Builder
-	front.WriteString("SELECT DISTINCT\n")
-	front.WriteString("  O.id AS Id,\n  O.file_uri AS fileURI,\n  O.thumbnail_uri AS thumbnailURI,\n  TS.name AS T\nFROM (\n  SELECT R1.object_id")
-	end.WriteString("\n) X\nJOIN medias O      ON X.object_id = O.id\n" +
-		"JOIN taggings R2    ON O.id = R2.object_id\n" +
-		"JOIN timestamp_tags TS ON R2.tag_id = TS.id\n" +
+	var sql strings.Builder
+	sql.WriteString("SELECT DISTINCT\n")
+	sql.WriteString("  O.id AS Id,\n  O.file_uri AS fileURI,\n  O.thumbnail_uri AS thumbnailURI,\n  TS.name AS T")
+	sql.WriteString(mid)
+	sql.WriteString("JOIN medias O      ON R1.object_id = O.id\n" +
+		"JOIN taggings RT    ON O.id = RT.object_id\n" +
+		"JOIN timestamp_tags TS ON RT.tag_id = TS.id\n" +
 		"JOIN tagsets S      ON TS.tagset_id = S.id\n" +
 		"WHERE S.name = 'Timestamp UTC'\n" +
 		"ORDER BY TS.name;\n")
 
-	return front.String() + mid + end.String()
+	return sql.String()
 }
 
 // GenerateSQLQueryForTimeline builds the SQL for the “timeline” endpoint.
@@ -931,6 +970,11 @@ func generateFilterQueryForState(filter ParsedFilter, filterNum int) string {
 		return fmt.Sprintf(
 			" select R.object_id from taggings R where R.tag_id in %s) R%d",
 			generateIdList(filter), filterNum,
+		)
+	case "objectid":
+		return fmt.Sprintf(
+			" %s) R%d",
+			strings.Replace(generateObjectIDFilterSQL(filter.Ids), "\n", " ", -1), filterNum,
 		)
 	case "numrange":
 		return fmt.Sprintf(

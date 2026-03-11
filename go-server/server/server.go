@@ -29,15 +29,16 @@ import (
 )
 
 var (
-	dbname     = gutils.MustGetEnv("DB_NAME")
-	user       = gutils.MustGetEnv("DB_USER")
-	pwd        = gutils.MustGetEnv("DB_PASSWORD")
-	db_host    = gutils.MustGetEnv("DB_HOST")
-	db_port    = gutils.MustGetEnvInt("DB_PORT")
-	sv_host    = gutils.MustGetEnv("SV_HOST")
-	sv_port    = gutils.MustGetEnvInt("SV_PORT")
-	http_port  = gutils.MustGetEnvInt("HTTP_PORT")
-	BATCH_SIZE = gutils.MustGetEnvInt("BATCH_SIZE")
+	dbname       = gutils.MustGetEnv("DB_NAME")
+	user         = gutils.MustGetEnv("DB_USER")
+	pwd          = gutils.MustGetEnv("DB_PASSWORD")
+	db_host      = gutils.MustGetEnv("DB_HOST")
+	db_port      = gutils.MustGetEnvInt("DB_PORT")
+	sv_host      = gutils.MustGetEnv("SV_HOST")
+	sv_port      = gutils.MustGetEnvInt("SV_PORT")
+	http_port    = gutils.MustGetEnvInt("HTTP_PORT")
+	vectorkvAddr = gutils.MustGetEnv("VECTORKV_ADDR")
+	BATCH_SIZE   = gutils.MustGetEnvInt("BATCH_SIZE")
 )
 
 var (
@@ -46,10 +47,12 @@ var (
 
 type DataLoaderServer struct {
 	pb.UnimplementedDataLoaderServer
-	db *sql.DB
+	db            *sql.DB
+	vectorFilters *vectorFilterResolver
+	vectorConn    *grpc.ClientConn
 }
 
-func NewDataLoaderServer(dbConnStr string) (*DataLoaderServer, error) {
+func NewDataLoaderServer(ctx context.Context, dbConnStr string, vectorAddr string) (*DataLoaderServer, error) {
 	db, err := sql.Open("postgres", dbConnStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to the database: %w", err)
@@ -62,14 +65,25 @@ func NewDataLoaderServer(dbConnStr string) (*DataLoaderServer, error) {
 		return nil, fmt.Errorf("failed to ping the database: %w", err)
 	}
 
+	vectorFilters, vectorConn, err := newVectorFilterResolverFromAddress(ctx, vectorAddr)
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to initialize vector filter client: %w", err)
+	}
+
 	return &DataLoaderServer{
-		db: db,
+		db:            db,
+		vectorFilters: vectorFilters,
+		vectorConn:    vectorConn,
 	}, nil
 }
 
 // Close closes the database connection.
 func (s *DataLoaderServer) Close() {
 	s.db.Close()
+	if s.vectorConn != nil {
+		s.vectorConn.Close()
+	}
 }
 
 func makeTagRequest(tagTypeId int64, tagSetId int64, tag string) *pb.CreateTagRequest {
@@ -379,7 +393,7 @@ func main() {
 		db_port) // port
 
 	grpcAddr := sv_host + ":" + strconv.Itoa(sv_port)
-	server, err := NewDataLoaderServer(conn_str)
+	server, err := NewDataLoaderServer(context.Background(), conn_str, vectorkvAddr)
 	if err != nil {
 		log.Fatalf("Error creating server: %v", err)
 	}
@@ -433,8 +447,8 @@ func main() {
 	httpMux.HandleFunc("/api/node/{id}/children", GetMetaDataCubeCompatNodeChildrenHandler(server.db))
 	httpMux.HandleFunc("/api/node/{id}/Children", GetMetaDataCubeCompatNodeChildrenHandler(server.db))
 	httpMux.HandleFunc("/api/cubeobject/{id}/tags", GetMetaDataCubeCompatCubeObjectTagsHandler(server.db))
-	httpMux.HandleFunc("/api/cell", GetMetaDataCubeCompatCellHandler(server.db))
-	httpMux.HandleFunc("/api/cell/", GetMetaDataCubeCompatCellHandler(server.db))
+	httpMux.HandleFunc("/api/cell", GetMetaDataCubeCompatCellHandler(server.db, server.vectorFilters))
+	httpMux.HandleFunc("/api/cell/", GetMetaDataCubeCompatCellHandler(server.db, server.vectorFilters))
 
 	// 5) Fallback to the generated gateway for everything else
 	httpMux.Handle("/", gwMux)

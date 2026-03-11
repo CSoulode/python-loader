@@ -170,11 +170,11 @@ func (s *DataLoaderServer) CreateMedias(stream pb.DataLoader_CreateMediaStreamSe
 			_, err := s.db.Exec(queryString, data...)
 			if err != nil {
 				log.Printf("Error: %s", err)
-				err = stream.Send(&pb.CreateMediaStreamResponse{
-					Message: &pb.CreateMediaStreamResponse_Error{
-						Error: status.Newf(codes.Internal, err.Error()).Proto(),
-					},
-				})
+					err = stream.Send(&pb.CreateMediaStreamResponse{
+						Message: &pb.CreateMediaStreamResponse_Error{
+							Error: status.New(codes.Internal, err.Error()).Proto(),
+						},
+					})
 				if err != nil {
 					return fmt.Errorf("failed to send response: %w", err)
 				}
@@ -198,7 +198,7 @@ func (s *DataLoaderServer) CreateMedias(stream pb.DataLoader_CreateMediaStreamSe
 			log.Printf("Error: %s", err)
 			err = stream.Send(&pb.CreateMediaStreamResponse{
 				Message: &pb.CreateMediaStreamResponse_Error{
-					Error: status.Newf(codes.Internal, err.Error()).Proto(),
+					Error: status.New(codes.Internal, err.Error()).Proto(),
 				},
 			})
 			if err != nil {
