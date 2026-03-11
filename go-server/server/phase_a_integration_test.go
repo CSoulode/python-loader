@@ -47,14 +47,37 @@ func (s *fakeVectorKVServer) KNN(_ context.Context, req *kvstorev1.KNNRequest) (
 	if req.GetModel() != "siglip2" {
 		return nil, fmt.Errorf("unexpected model %q", req.GetModel())
 	}
-	if req.GetK() != 2 {
+	if req.GetK() <= 0 {
 		return nil, fmt.Errorf("unexpected k %d", req.GetK())
 	}
-	return &kvstorev1.KNNResponse{
-		Neighbors: []*kvstorev1.Neighbor{
-			{Id: 1, Distance: 0},
-			{Id: 2, Distance: 0.25},
-		},
+
+	all := []*kvstorev1.Neighbor{
+		{Id: 1, Distance: 0},
+		{Id: 2, Distance: 0.25},
+		{Id: 3, Distance: 0.75},
+	}
+	filtered := make([]*kvstorev1.Neighbor, 0, len(all))
+	for _, neighbor := range all {
+		if req.GetMaxDistance() > 0 && neighbor.GetDistance() > req.GetMaxDistance() {
+			continue
+		}
+		filtered = append(filtered, neighbor)
+		if int32(len(filtered)) == req.GetK() {
+			break
+		}
+	}
+	return &kvstorev1.KNNResponse{Neighbors: filtered}, nil
+}
+
+func (s *fakeVectorKVServer) ListModels(_ context.Context, _ *kvstorev1.ListModelsRequest) (*kvstorev1.ListModelsResponse, error) {
+	return &kvstorev1.ListModelsResponse{
+		DefaultModel: "siglip2",
+		Models: []*kvstorev1.ModelInfo{{
+			Name:           "siglip2",
+			Dim:            3,
+			TagsetName:     "SigLIP2",
+			DistanceMetric: "cosine",
+		}},
 	}, nil
 }
 
@@ -178,6 +201,94 @@ func TestPhaseAEndToEndGRPCAndHTTP(t *testing.T) {
 		var objects []compatCubeObject
 		httpGetJSON(t, env.httpServer.URL+"/?"+params.Encode(), &objects)
 		assertCompatObjectIDs(t, objects, []int32{1, 2})
+	})
+}
+
+func TestPhaseBVectorDimensionEndToEndGRPCAndHTTP(t *testing.T) {
+	dbURL := strings.TrimSpace(os.Getenv(phaseATestDatabaseEnv))
+	if dbURL == "" {
+		t.Skipf("%s is not set", phaseATestDatabaseEnv)
+	}
+
+	env := setupPhaseATestEnv(t, dbURL)
+	defer env.cleanup()
+
+	vectorDimension := &pb.VectorSearchDimension{
+		ModelName: "siglip2",
+		Reference: &pb.VectorReference{Ref: &pb.VectorReference_ObjectId{ObjectId: 1}},
+		BucketCfg: &pb.BucketConfig{
+			Strategy: pb.BucketStrategy_EQUAL_WIDTH,
+			Count:    2,
+			DistMin:  0,
+			DistMax:  0.5,
+		},
+		MaxResults: 2,
+		Axis:       pb.AxisType_Y_AXIS,
+	}
+
+	t.Run("grpc state returns bucket infos on first response", func(t *testing.T) {
+		responses := collectBrowsingStateResponses(t, env.grpcClient, &pb.GetBrowsingStateRequest{
+			Filters: []*pb.AxisFilter{{
+				AxisFilterType: pb.AxisType_X_AXIS,
+				Value:          1,
+				ValueType:      pb.FilterValueType_TAGSET,
+			}},
+			VectorDimension: vectorDimension,
+		})
+
+		if len(responses) != 2 {
+			t.Fatalf("got %d responses, want 2", len(responses))
+		}
+		if len(responses[0].GetBucketInfos()) != 2 {
+			t.Fatalf("first response bucket infos = %d, want 2", len(responses[0].GetBucketInfos()))
+		}
+		assertStateCellsByXY(t, responses, map[string]cellExpectation{
+			"1:1": {count: 1, representativeID: 1},
+			"2:2": {count: 1, representativeID: 2},
+		})
+	})
+
+	t.Run("grpc all returns selected bucket contents", func(t *testing.T) {
+		bucketID := int32(1)
+		responses := collectBrowsingStateResponses(t, env.grpcClient, &pb.GetBrowsingStateRequest{
+			Filters: []*pb.AxisFilter{{
+				AxisFilterType: pb.AxisType_X_AXIS,
+				Value:          1,
+				ValueType:      pb.FilterValueType_TAGSET,
+			}},
+			All:             "[]",
+			VectorDimension: vectorDimension,
+			VectorBucketId:  &bucketID,
+		})
+		assertAllCubeObjectIDs(t, responses, []int32{2})
+	})
+
+	t.Run("http state returns envelope with bucket infos", func(t *testing.T) {
+		params := url.Values{}
+		params.Set("xAxis", `{"type":"tagset","id":1}`)
+		params.Set("vectorDimension", `{"model":"siglip2","objectId":1,"axis":"y","bucketCount":2,"bucketStrategy":"equal_width","distMin":0,"distMax":0.5,"maxResults":2}`)
+
+		var response compatBrowsingStateEnvelope
+		httpGetJSON(t, env.httpServer.URL+"/?"+params.Encode(), &response)
+		if len(response.BucketInfos) != 2 {
+			t.Fatalf("bucket infos = %d, want 2", len(response.BucketInfos))
+		}
+		assertCompatStateCells(t, response.Cells, map[int32]cellExpectation{
+			1: {count: 1, representativeID: 1},
+			2: {count: 1, representativeID: 2},
+		})
+	})
+
+	t.Run("http all returns selected bucket contents", func(t *testing.T) {
+		params := url.Values{}
+		params.Set("xAxis", `{"type":"tagset","id":1}`)
+		params.Set("all", "[]")
+		params.Set("vectorDimension", `{"model":"siglip2","objectId":1,"axis":"y","bucketCount":2,"bucketStrategy":"equal_width","distMin":0,"distMax":0.5,"maxResults":2}`)
+		params.Set("vectorBucketId", "0")
+
+		var objects []compatCubeObject
+		httpGetJSON(t, env.httpServer.URL+"/?"+params.Encode(), &objects)
+		assertCompatObjectIDs(t, objects, []int32{1})
 	})
 }
 
@@ -399,6 +510,27 @@ func assertStateCells(t *testing.T, responses []*pb.BrowsingStateResponse, expec
 		}
 		if got := response.GetCubeObjects()[0].GetId(); got != want.representativeID {
 			t.Fatalf("cell x=%d representative=%d want=%d", response.GetX(), got, want.representativeID)
+		}
+	}
+}
+
+func assertStateCellsByXY(t *testing.T, responses []*pb.BrowsingStateResponse, expected map[string]cellExpectation) {
+	t.Helper()
+
+	if len(responses) != len(expected) {
+		t.Fatalf("got %d responses, want %d", len(responses), len(expected))
+	}
+	for _, response := range responses {
+		key := fmt.Sprintf("%d:%d", response.GetX(), response.GetY())
+		want, ok := expected[key]
+		if !ok {
+			t.Fatalf("unexpected cell %s", key)
+		}
+		if response.GetCount() != want.count {
+			t.Fatalf("cell %s count=%d want=%d", key, response.GetCount(), want.count)
+		}
+		if got := response.GetCubeObjects()[0].GetId(); got != want.representativeID {
+			t.Fatalf("cell %s representative=%d want=%d", key, got, want.representativeID)
 		}
 	}
 }

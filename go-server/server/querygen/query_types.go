@@ -24,6 +24,10 @@ type ParsedFilter struct {
 
 type joinBranch struct{ sql, ax string }
 
+type StateQueryOpts struct {
+	AxisSubqueries map[string]string
+}
+
 // UngroupedOpts controls optional behaviors for GenerateUngroupedSQLForState.
 type UngroupedOpts struct {
 	// BranchDistinct: when true, each branch SELECT uses DISTINCT (slower TTFB, fewer dup rows).
@@ -37,6 +41,9 @@ type UngroupedOpts struct {
 
 	// UseLateralMediaJoin: when true, uses LATERAL JOIN for media the branch.
 	UseLateralMediaJoin bool
+
+	// AxisSubqueries optionally overrides the SQL source for x/y/z axes.
+	AxisSubqueries map[string]string
 }
 
 type InitializeIdsPlan struct {

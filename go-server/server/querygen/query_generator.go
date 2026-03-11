@@ -156,6 +156,10 @@ func (p *ParsedAxis) BuildInitializeIdsPlan() (*InitializeIdsPlan, error) {
 		return &InitializeIdsPlan{
 			Kind: "fallback",
 		}, nil
+	case "vector":
+		return &InitializeIdsPlan{
+			Kind: "precomputed",
+		}, nil
 	}
 }
 
@@ -190,6 +194,7 @@ func GenerateUngroupedSQLForState(
 	branchDistinct := o.BranchDistinct
 	restrictIDs := o.RestrictIDs
 	useLateralMediaJoin := o.UseLateralMediaJoin
+	axisSubqueries := o.AxisSubqueries
 
 	type branch struct {
 		sql string
@@ -214,6 +219,12 @@ func GenerateUngroupedSQLForState(
 	branches := make([]branch, 0, 3+len(filters))
 
 	addAxis := func(axisType string, vertexID int, ax string) {
+		if axisSubqueries != nil {
+			if sql, ok := axisSubqueries[ax]; ok && strings.TrimSpace(sql) != "" {
+				branches = append(branches, branch{sql: sql, ax: ax})
+				return
+			}
+		}
 		if axisType == "" {
 			return
 		}
@@ -636,7 +647,13 @@ func GenerateSQLQueryForState(
 	yType string, yVertexID int,
 	zType string, zVertexID int,
 	filtersList []ParsedFilter,
+	opts ...StateQueryOpts,
 ) string {
+	var o StateQueryOpts
+	if len(opts) > 0 {
+		o = opts[0]
+	}
+
 	numberOfAdditionalFilters := len(filtersList)
 
 	// No axes/filters => simple base query
@@ -664,6 +681,12 @@ func GenerateSQLQueryForState(
 
 	// Axis branches
 	addAxis := func(axisType string, vertexID int, ax string) {
+		if o.AxisSubqueries != nil {
+			if sql, ok := o.AxisSubqueries[ax]; ok && strings.TrimSpace(sql) != "" {
+				branches = append(branches, branch{sql: sql, isDim: true, ax: ax})
+				return
+			}
+		}
 		if axisType == "" {
 			return
 		}

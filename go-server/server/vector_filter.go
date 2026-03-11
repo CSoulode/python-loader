@@ -23,6 +23,7 @@ const vectorDialTimeout = 5 * time.Second
 type vectorSearchClient interface {
 	Get(context.Context, *kvstorev1.GetRequest, ...grpc.CallOption) (*kvstorev1.GetResponse, error)
 	KNN(context.Context, *kvstorev1.KNNRequest, ...grpc.CallOption) (*kvstorev1.KNNResponse, error)
+	ListModels(context.Context, *kvstorev1.ListModelsRequest, ...grpc.CallOption) (*kvstorev1.ListModelsResponse, error)
 }
 
 type vectorFilterResolver struct {
@@ -218,22 +219,35 @@ func sortedNeighborIDs(neighbors []*kvstorev1.Neighbor) []int {
 	return ids
 }
 
+type browsingStateRequestPlan struct {
+	AxisOrder      []string
+	AxisX          qg.ParsedAxis
+	AxisY          qg.ParsedAxis
+	AxisZ          qg.ParsedAxis
+	Filters        []qg.ParsedFilter
+	AxisSubqueries map[string]string
+	BucketInfos    []*pb.BucketInfo
+}
+
 func (s *DataLoaderServer) parseBrowsingStateRequest(
 	ctx context.Context,
 	req *pb.GetBrowsingStateRequest,
-) ([]string, qg.ParsedAxis, qg.ParsedAxis, qg.ParsedAxis, []qg.ParsedFilter, error) {
+) (*browsingStateRequestPlan, error) {
 	if err := rejectAxisLevelVectorFilters(req.GetFilters()); err != nil {
-		return nil, qg.ParsedAxis{}, qg.ParsedAxis{}, qg.ParsedAxis{}, nil, err
+		return nil, err
+	}
+	if req.GetVectorFilter() != nil && req.GetVectorDimension() != nil {
+		return nil, status.Error(codes.InvalidArgument, "vector_filter and vector_dimension cannot be used together")
 	}
 
 	axisOrder, axisX, axisY, axisZ, filters, err := parseAxesAndFilters(req)
 	if err != nil {
-		return nil, qg.ParsedAxis{}, qg.ParsedAxis{}, qg.ParsedAxis{}, nil, err
+		return nil, err
 	}
 
 	vectorIDs, active, err := s.resolveRequestVectorFilter(ctx, req)
 	if err != nil {
-		return nil, qg.ParsedAxis{}, qg.ParsedAxis{}, qg.ParsedAxis{}, nil, err
+		return nil, err
 	}
 
 	filters = appendVectorObjectIDFilter(filters, vectorIDs, active)
@@ -241,7 +255,14 @@ func (s *DataLoaderServer) parseBrowsingStateRequest(
 		axisOrder = append(axisOrder, "filter")
 	}
 
-	return axisOrder, axisX, axisY, axisZ, filters, nil
+	plan := &browsingStateRequestPlan{
+		AxisOrder: axisOrder,
+		AxisX:     axisX,
+		AxisY:     axisY,
+		AxisZ:     axisZ,
+		Filters:   filters,
+	}
+	return s.applyVectorDimensionToPlan(ctx, plan, req.GetVectorDimension(), req.VectorBucketId, strings.TrimSpace(req.GetAll()) != "", strings.TrimSpace(req.GetTimeline()) != "")
 }
 
 func (s *DataLoaderServer) resolveRequestVectorFilter(
@@ -270,6 +291,119 @@ func appendVectorObjectIDFilter(filters []qg.ParsedFilter, ids []int, active boo
 	next := make([]qg.ParsedFilter, 0, len(filters)+1)
 	next = append(next, filters...)
 	next = append(next, qg.ParsedFilter{Type: "objectid", Ids: ids})
+	return next
+}
+
+func (s *DataLoaderServer) applyVectorDimensionToPlan(
+	ctx context.Context,
+	plan *browsingStateRequestPlan,
+	vectorDimension *pb.VectorSearchDimension,
+	vectorBucketID *int32,
+	allDefined bool,
+	timelineDefined bool,
+) (*browsingStateRequestPlan, error) {
+	if vectorDimension == nil {
+		if vectorBucketID != nil {
+			return nil, status.Error(codes.InvalidArgument, "vector_bucket_id requires vector_dimension")
+		}
+		return plan, nil
+	}
+	if timelineDefined {
+		return nil, status.Error(codes.InvalidArgument, "vector_dimension is not supported with timeline requests")
+	}
+
+	result, err := s.handleVectorDimension(ctx, vectorDimension)
+	if err != nil {
+		return nil, err
+	}
+
+	if allDefined {
+		if vectorBucketID == nil {
+			return nil, status.Error(codes.InvalidArgument, "vector_bucket_id must be set when all and vector_dimension are both provided")
+		}
+		if *vectorBucketID < 0 {
+			return nil, status.Error(codes.InvalidArgument, "vector_bucket_id must be >= 0")
+		}
+		plan.Filters = appendVectorObjectIDFilter(plan.Filters, lookupBucketObjectIDs(result.ObjectIDsByBucket, *vectorBucketID), true)
+		if !containsAxisOrder(plan.AxisOrder, "filter") {
+			plan.AxisOrder = append(plan.AxisOrder, "filter")
+		}
+		return plan, nil
+	}
+
+	if vectorBucketID != nil {
+		return nil, status.Error(codes.InvalidArgument, "vector_bucket_id is only valid when all and vector_dimension are both provided")
+	}
+
+	axisKey := axisToken(result.AxisType)
+	if axisKey == "" {
+		return nil, status.Error(codes.InvalidArgument, "vector_dimension.axis must be X_AXIS, Y_AXIS, or Z_AXIS")
+	}
+	if currentAxis := selectAxisByToken(plan, axisKey); currentAxis.Type != "" {
+		return nil, status.Errorf(codes.InvalidArgument, "vector_dimension.axis conflicts with an existing %s axis", axisKey)
+	}
+
+	setAxisByToken(plan, axisKey, result.ParsedAxis)
+	plan.AxisOrder = ensureAxisOrder(plan.AxisOrder, axisKey)
+	plan.AxisSubqueries = map[string]string{axisKey: result.AxisSQL}
+	plan.BucketInfos = cloneBucketInfos(result.BucketInfos)
+	return plan, nil
+}
+
+func axisToken(axisType pb.AxisType) string {
+	switch axisType {
+	case pb.AxisType_X_AXIS:
+		return "x"
+	case pb.AxisType_Y_AXIS:
+		return "y"
+	case pb.AxisType_Z_AXIS:
+		return "z"
+	default:
+		return ""
+	}
+}
+
+func selectAxisByToken(plan *browsingStateRequestPlan, axisKey string) qg.ParsedAxis {
+	switch axisKey {
+	case "x":
+		return plan.AxisX
+	case "y":
+		return plan.AxisY
+	case "z":
+		return plan.AxisZ
+	default:
+		return qg.ParsedAxis{}
+	}
+}
+
+func setAxisByToken(plan *browsingStateRequestPlan, axisKey string, axis qg.ParsedAxis) {
+	switch axisKey {
+	case "x":
+		plan.AxisX = axis
+	case "y":
+		plan.AxisY = axis
+	case "z":
+		plan.AxisZ = axis
+	}
+}
+
+func ensureAxisOrder(axisOrder []string, target string) []string {
+	if containsAxisOrder(axisOrder, target) {
+		return axisOrder
+	}
+
+	next := make([]string, 0, len(axisOrder)+1)
+	inserted := false
+	for _, item := range axisOrder {
+		if item == "filter" && !inserted {
+			next = append(next, target)
+			inserted = true
+		}
+		next = append(next, item)
+	}
+	if !inserted {
+		next = append(next, target)
+	}
 	return next
 }
 

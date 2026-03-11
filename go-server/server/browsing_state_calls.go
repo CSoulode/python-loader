@@ -486,6 +486,14 @@ func ExecuteInitializeIdsPlan(ctx context.Context, db *sql.DB, plan *qg.Initiali
 	case "fallback":
 		idList[1] = defAxisPos
 
+	case "precomputed":
+		if len(p.Ids) == 0 {
+			idList[1] = defAxisPos
+		} else {
+			p.Ids = p.Ids
+			return nil
+		}
+
 	default:
 		return fmt.Errorf("unknown plan kind %q", plan.Kind)
 	}
@@ -511,13 +519,15 @@ func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesIncrementalGrouping(
 	ctx := stream.Context()
 
 	// ---------- Parse request params ----------
-	axisOrder, axisX, axisY, axisZ, filters, err := s.parseBrowsingStateRequest(ctx, req)
-	if axisOrder == nil {
+	plan, err := s.parseBrowsingStateRequest(ctx, req)
+	if plan == nil {
 		return fmt.Errorf("invalid axis filter order")
 	}
 	if err != nil {
 		return err
 	}
+	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
+	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
 
 	// ---------- Axis positions (needed to map ids -> positions) ----------
 	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "DistinctBranchesIncrementalGrouping(initAxes).exec"); err != nil {
@@ -533,6 +543,7 @@ func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesIncrementalGrouping(
 		filters,
 		qg.UngroupedOpts{
 			BranchDistinct:      true,
+			AxisSubqueries:      plan.AxisSubqueries,
 			UseLateralMediaJoin: useLateralMediaJoin,
 		},
 	)
@@ -586,7 +597,7 @@ func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesIncrementalGrouping(
 			streamBatchSize,
 			65536, // pendingCap
 			func(sn snap) *pb.BrowsingStateResponse {
-				return &pb.BrowsingStateResponse{
+				return bucketInfos.Attach(&pb.BrowsingStateResponse{
 					X:     sn.k.x,
 					Y:     sn.k.y,
 					Z:     sn.k.z,
@@ -596,7 +607,7 @@ func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesIncrementalGrouping(
 						FileUri:      sn.fileURI,
 						ThumbnailUri: sn.thumbURI,
 					}},
-				}
+				})
 			},
 			m,
 		)
@@ -695,13 +706,15 @@ func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesFull(
 ) error {
 	ctx := stream.Context()
 	// ---------- Parse request params ----------
-	axisOrder, axisX, axisY, axisZ, filters, err := s.parseBrowsingStateRequest(ctx, req)
-	if axisOrder == nil {
+	plan, err := s.parseBrowsingStateRequest(ctx, req)
+	if plan == nil {
 		return fmt.Errorf("invalid axis filter order")
 	}
 	if err != nil {
 		return err
 	}
+	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
+	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
 
 	// ---------- Axis positions ----------
 	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "DistinctBranchesFull(initAxes).exec"); err != nil {
@@ -717,6 +730,7 @@ func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesFull(
 		filters,
 		qg.UngroupedOpts{
 			BranchDistinct:      true,
+			AxisSubqueries:      plan.AxisSubqueries,
 			UseLateralMediaJoin: useLateralMediaJoin,
 		},
 	)
@@ -876,6 +890,7 @@ scanLoop:
 				ThumbnailUri: a.thumbURI,
 			}},
 		}
+		resp = bucketInfos.Attach(resp)
 
 		select {
 		case <-ctx.Done():
@@ -920,13 +935,15 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesSingles(
 ) error {
 	ctx := stream.Context()
 
-	axisOrder, axisX, axisY, axisZ, filters, err := s.parseBrowsingStateRequest(ctx, req)
-	if axisOrder == nil {
+	plan, err := s.parseBrowsingStateRequest(ctx, req)
+	if plan == nil {
 		return fmt.Errorf("invalid axis filter order")
 	}
 	if err != nil {
 		return err
 	}
+	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
+	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
 
 	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "NonDistinctBranchesSingles(initAxes).exec"); err != nil {
 		return err
@@ -940,6 +957,7 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesSingles(
 		filters,
 		qg.UngroupedOpts{
 			BranchDistinct:      false,
+			AxisSubqueries:      plan.AxisSubqueries,
 			UseLateralMediaJoin: useLateralMediaJoin,
 		},
 	)
@@ -1030,6 +1048,7 @@ scanLoop:
 				ThumbnailUri: r.ThumbnailUri,
 			}},
 		}
+		resp = bucketInfos.Attach(resp)
 
 		// Count "produced" only if enqueue succeeds. Track queue depth as backpressure evidence.
 		m.IncQueue(+1)
@@ -1079,13 +1098,15 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesDeduplicatedSingle
 	// - true:  dedup in sender goroutine (interesting for comparison / backpressure evidence)
 	dedupInSender := false
 
-	axisOrder, axisX, axisY, axisZ, filters, err := s.parseBrowsingStateRequest(ctx, req)
-	if axisOrder == nil {
+	plan, err := s.parseBrowsingStateRequest(ctx, req)
+	if plan == nil {
 		return fmt.Errorf("invalid axis filter order")
 	}
 	if err != nil {
 		return err
 	}
+	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
+	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
 
 	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "NonDistinctBranchesDedupSingles(initAxes).exec"); err != nil {
 		return err
@@ -1099,6 +1120,7 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesDeduplicatedSingle
 		filters,
 		qg.UngroupedOpts{
 			BranchDistinct:      false,
+			AxisSubqueries:      plan.AxisSubqueries,
 			UseLateralMediaJoin: useLateralMediaJoin,
 		},
 	)
@@ -1251,6 +1273,7 @@ scanLoop:
 				ThumbnailUri: r.ThumbnailUri,
 			}},
 		}
+		resp = bucketInfos.Attach(resp)
 
 		// Count "produced" only if enqueue succeeds; track queue depth for backpressure.
 		m.IncQueue(+1)
@@ -1311,13 +1334,15 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesFull(
 	ctx := stream.Context()
 
 	// ---------- Parse request params ----------
-	axisOrder, axisX, axisY, axisZ, filters, err := s.parseBrowsingStateRequest(ctx, req)
-	if axisOrder == nil {
+	plan, err := s.parseBrowsingStateRequest(ctx, req)
+	if plan == nil {
 		return fmt.Errorf("invalid axis filter order")
 	}
 	if err != nil {
 		return err
 	}
+	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
+	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
 
 	// ---------- Axis positions ----------
 	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "NonDistinctBranchesFull(initAxes).exec"); err != nil {
@@ -1327,6 +1352,7 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesFull(
 	// ---------- Ungrouped SQL (NO DISTINCT, NO GROUP BY) ----------
 	qgOpts := qg.UngroupedOpts{
 		BranchDistinct:      false,
+		AxisSubqueries:      plan.AxisSubqueries,
 		UseLateralMediaJoin: useLateralMediaJoin,
 	}
 	sqlStr := qg.GenerateUngroupedSQLForState(
@@ -1504,6 +1530,7 @@ scanLoop:
 				ThumbnailUri: a.thumbURI,
 			}},
 		}
+		resp = bucketInfos.Attach(resp)
 
 		select {
 		case <-ctx.Done():
@@ -1539,13 +1566,15 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesIncrementalGroupin
 ) error {
 	ctx := stream.Context()
 
-	axisOrder, axisX, axisY, axisZ, filters, err := s.parseBrowsingStateRequest(ctx, req)
-	if axisOrder == nil {
+	plan, err := s.parseBrowsingStateRequest(ctx, req)
+	if plan == nil {
 		return fmt.Errorf("invalid axis filter order")
 	}
 	if err != nil {
 		return err
 	}
+	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
+	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
 
 	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "NonDistinctBranchesIncrementalGrouping(initAxes).exec"); err != nil {
 		return err
@@ -1553,6 +1582,7 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesIncrementalGroupin
 
 	qgOpts := qg.UngroupedOpts{
 		BranchDistinct:      false,
+		AxisSubqueries:      plan.AxisSubqueries,
 		UseLateralMediaJoin: useLateralMediaJoin,
 	}
 
@@ -1617,7 +1647,7 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesIncrementalGroupin
 			streamBatchSize,
 			65536,
 			func(sn snap) *pb.BrowsingStateResponse {
-				return &pb.BrowsingStateResponse{
+				return bucketInfos.Attach(&pb.BrowsingStateResponse{
 					X:     sn.k.x,
 					Y:     sn.k.y,
 					Z:     sn.k.z,
@@ -1627,7 +1657,7 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesIncrementalGroupin
 						FileUri:      sn.fileURI,
 						ThumbnailUri: sn.thumbURI,
 					}},
-				}
+				})
 			},
 			m,
 		)
@@ -1717,14 +1747,16 @@ scanLoop:
 
 func (s *DataLoaderServer) GetBrowsingState(req *pb.GetBrowsingStateRequest, stream pb.DataLoader_GetBrowsingStateServer) error {
 	// ---------- Parse request params ----------
-	axisOrder, axisX, axisY, axisZ, filters, err := s.parseBrowsingStateRequest(stream.Context(), req)
+	plan, err := s.parseBrowsingStateRequest(stream.Context(), req)
 
-	if axisOrder == nil {
+	if plan == nil {
 		return fmt.Errorf("invalid axis filter order")
 	}
 	if err != nil {
 		return err
 	}
+	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
+	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
 
 	// Flags for “all” and “timeline”
 	allDefined := req.All != ""
@@ -1770,6 +1802,7 @@ func (s *DataLoaderServer) GetBrowsingState(req *pb.GetBrowsingStateRequest, str
 			resp := &pb.BrowsingStateResponse{
 				CubeObjects: cubeObjects,
 			}
+			resp = bucketInfos.Attach(resp)
 			if err := stream.Send(resp); err != nil {
 				return fmt.Errorf("GetBrowsingState failed to send CellResponse: %w", err)
 			}
@@ -1789,6 +1822,7 @@ func (s *DataLoaderServer) GetBrowsingState(req *pb.GetBrowsingStateRequest, str
 		axisY.Type, axisY.Id,
 		axisZ.Type, axisZ.Id,
 		filters,
+		qg.StateQueryOpts{AxisSubqueries: plan.AxisSubqueries},
 	)
 	traceSQL("GetBrowsingState.exec(state)", formatSQLForLog("\n"+sqlStr, nil, sqlTraceMaxLtr))
 	rows, err := s.db.QueryContext(stream.Context(), sqlStr)
@@ -1824,6 +1858,7 @@ func (s *DataLoaderServer) GetBrowsingState(req *pb.GetBrowsingStateRequest, str
 				ThumbnailUri: r.ThumbnailUri,
 			}},
 		}
+		resp = bucketInfos.Attach(resp)
 		if err := stream.Send(resp); err != nil {
 			return fmt.Errorf("GetBrowsingState send state response: %w", err)
 		}
@@ -1839,13 +1874,15 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 	ctx := stream.Context()
 
 	// ---------- Parse request params ----------
-	axisOrder, axisX, axisY, axisZ, filters, err := s.parseBrowsingStateRequest(ctx, req)
-	if axisOrder == nil {
+	plan, err := s.parseBrowsingStateRequest(ctx, req)
+	if plan == nil {
 		return fmt.Errorf("invalid axis filter order")
 	}
 	if err != nil {
 		return err
 	}
+	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
+	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
 
 	// ---------- Instrumentation Init ----------
 	// Captures everything from here (sender plumbing, tx begin, query, scan, send).
@@ -1986,6 +2023,7 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 
 		if len(cubeObjects) > 0 {
 			resp := &pb.BrowsingStateResponse{CubeObjects: cubeObjects}
+			resp = bucketInfos.Attach(resp)
 			if err := enqueue(resp); err != nil {
 				return finish(fmt.Errorf("GetBrowsingState failed to enqueue CellResponse: %w", err))
 			}
@@ -2005,6 +2043,7 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 		axisY.Type, axisY.Id,
 		axisZ.Type, axisZ.Id,
 		filters,
+		qg.StateQueryOpts{AxisSubqueries: plan.AxisSubqueries},
 	)
 
 	traceSQL("GetBrowsingState.exec(state)", formatSQLForLog("\n"+sqlStr, nil, sqlTraceMaxLtr))
@@ -2058,6 +2097,7 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 				ThumbnailUri: r.ThumbnailUri,
 			}},
 		}
+		resp = bucketInfos.Attach(resp)
 
 		// enqueue instead of stream.Send (bounded queue provides backpressure)
 		if err := enqueue(resp); err != nil {

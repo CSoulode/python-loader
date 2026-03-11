@@ -16,13 +16,16 @@ import (
 )
 
 type stubVectorSearchClient struct {
-	getResp *kvstorev1.GetResponse
-	getErr  error
-	knnResp *kvstorev1.KNNResponse
-	knnErr  error
+	getResp        *kvstorev1.GetResponse
+	getErr         error
+	knnResp        *kvstorev1.KNNResponse
+	knnErr         error
+	listModelsResp *kvstorev1.ListModelsResponse
+	listModelsErr  error
 
-	gotGet *kvstorev1.GetRequest
-	gotKNN *kvstorev1.KNNRequest
+	gotGet        *kvstorev1.GetRequest
+	gotKNN        *kvstorev1.KNNRequest
+	gotListModels *kvstorev1.ListModelsRequest
 }
 
 func (s *stubVectorSearchClient) Get(_ context.Context, req *kvstorev1.GetRequest, _ ...grpc.CallOption) (*kvstorev1.GetResponse, error) {
@@ -33,6 +36,11 @@ func (s *stubVectorSearchClient) Get(_ context.Context, req *kvstorev1.GetReques
 func (s *stubVectorSearchClient) KNN(_ context.Context, req *kvstorev1.KNNRequest, _ ...grpc.CallOption) (*kvstorev1.KNNResponse, error) {
 	s.gotKNN = req
 	return s.knnResp, s.knnErr
+}
+
+func (s *stubVectorSearchClient) ListModels(_ context.Context, req *kvstorev1.ListModelsRequest, _ ...grpc.CallOption) (*kvstorev1.ListModelsResponse, error) {
+	s.gotListModels = req
+	return s.listModelsResp, s.listModelsErr
 }
 
 func TestVectorFilterResolverResolveObjectIDsObjectReference(t *testing.T) {
@@ -93,7 +101,7 @@ func TestParseBrowsingStateRequestAppendsVectorFilter(t *testing.T) {
 		}),
 	}
 
-	axisOrder, _, _, _, filters, err := server.parseBrowsingStateRequest(context.Background(), &pb.GetBrowsingStateRequest{
+	plan, err := server.parseBrowsingStateRequest(context.Background(), &pb.GetBrowsingStateRequest{
 		Filters: []*pb.AxisFilter{{
 			AxisFilterType: pb.AxisType_X_AXIS,
 			Value:          11,
@@ -108,10 +116,10 @@ func TestParseBrowsingStateRequestAppendsVectorFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseBrowsingStateRequest returned error: %v", err)
 	}
-	if !reflect.DeepEqual(axisOrder, []string{"x", "filter"}) {
-		t.Fatalf("axisOrder = %v", axisOrder)
+	if !reflect.DeepEqual(plan.AxisOrder, []string{"x", "filter"}) {
+		t.Fatalf("axisOrder = %v", plan.AxisOrder)
 	}
-	if got := filters[len(filters)-1]; got.Type != "objectid" || !reflect.DeepEqual(got.Ids, []int{5, 8}) {
+	if got := plan.Filters[len(plan.Filters)-1]; got.Type != "objectid" || !reflect.DeepEqual(got.Ids, []int{5, 8}) {
 		t.Fatalf("vector filter = %+v", got)
 	}
 }
@@ -119,7 +127,7 @@ func TestParseBrowsingStateRequestAppendsVectorFilter(t *testing.T) {
 func TestParseBrowsingStateRequestRejectsTimelineVectorFilter(t *testing.T) {
 	server := &DataLoaderServer{vectorFilters: newVectorFilterResolver(&stubVectorSearchClient{})}
 
-	_, _, _, _, _, err := server.parseBrowsingStateRequest(context.Background(), &pb.GetBrowsingStateRequest{
+	_, err := server.parseBrowsingStateRequest(context.Background(), &pb.GetBrowsingStateRequest{
 		Timeline: "42",
 		VectorFilter: &pb.VectorFilterConfig{
 			ModelName: "siglip2",

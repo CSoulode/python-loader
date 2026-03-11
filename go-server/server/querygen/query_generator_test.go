@@ -50,3 +50,41 @@ func TestGenerateUngroupedSQLForStateWithLargeObjectIDFilterUsesValues(t *testin
 		t.Fatalf("GenerateUngroupedSQLForState = %s", sqlStr)
 	}
 }
+
+func TestGenerateSQLQueryForStateWithAxisSubquery(t *testing.T) {
+	sqlStr := GenerateSQLQueryForState(
+		[]string{"x"},
+		"vector", -1,
+		"", -1,
+		"", -1,
+		nil,
+		StateQueryOpts{
+			AxisSubqueries: map[string]string{
+				"x": "SELECT V.object_id, V.id\nFROM (VALUES (7,0),(8,1)) AS V(object_id, id)",
+			},
+		},
+	)
+
+	if !strings.Contains(sqlStr, "VALUES (7,0),(8,1)") {
+		t.Fatalf("GenerateSQLQueryForState = %s", sqlStr)
+	}
+}
+
+func TestGenerateUngroupedSQLForStateWithAxisSubquery(t *testing.T) {
+	sqlStr := GenerateUngroupedSQLForState(
+		[]string{"y"},
+		"", -1,
+		"vector", -1,
+		"", -1,
+		nil,
+		UngroupedOpts{
+			AxisSubqueries: map[string]string{
+				"y": "SELECT V.object_id, V.id\nFROM (VALUES (7,0),(8,1)) AS V(object_id, id)",
+			},
+		},
+	)
+
+	if !strings.Contains(sqlStr, "VALUES (7,0),(8,1)") {
+		t.Fatalf("GenerateUngroupedSQLForState = %s", sqlStr)
+	}
+}

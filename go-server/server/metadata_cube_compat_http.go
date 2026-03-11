@@ -90,6 +90,18 @@ type compatBrowsingStateResponse struct {
 	CubeObjects []compatCubeObject `json:"cubeObjects"`
 }
 
+type compatBucketInfo struct {
+	BucketID   int32   `json:"bucketId"`
+	LowerBound float32 `json:"lowerBound"`
+	UpperBound float32 `json:"upperBound"`
+	Label      string  `json:"label"`
+}
+
+type compatBrowsingStateEnvelope struct {
+	BucketInfos []compatBucketInfo            `json:"bucketInfos"`
+	Cells       []compatBrowsingStateResponse `json:"cells"`
+}
+
 type compatCubeObjectTag struct {
 	TagsetName string `json:"tagsetName"`
 	Name       string `json:"name"`
@@ -830,6 +842,20 @@ func GetMetaDataCubeCompatCellHandler(db *sql.DB, vectorFilters *vectorFilterRes
 			http.Error(w, vectorFilterHTTPMessage(err), mapVectorFilterHTTPStatus(err))
 			return
 		}
+		vectorDimensionCfg, err := parseCompatVectorDimension(r.URL.Query().Get("vectorDimension"))
+		if err != nil {
+			http.Error(w, vectorFilterHTTPMessage(err), mapVectorFilterHTTPStatus(err))
+			return
+		}
+		vectorBucketID, err := parseCompatVectorBucketID(r.URL.Query().Get("vectorBucketId"))
+		if err != nil {
+			http.Error(w, vectorFilterHTTPMessage(err), mapVectorFilterHTTPStatus(err))
+			return
+		}
+		if vectorFilterCfg != nil && vectorDimensionCfg != nil {
+			http.Error(w, "vectorFilter and vectorDimension cannot be used together", http.StatusBadRequest)
+			return
+		}
 		if vectorFilterCfg != nil {
 			vectorIDs, err := vectorFilters.ResolveObjectIDs(r.Context(), vectorFilterCfg)
 			if err != nil {
@@ -838,6 +864,31 @@ func GetMetaDataCubeCompatCellHandler(db *sql.DB, vectorFilters *vectorFilterRes
 			}
 			filters = appendVectorObjectIDFilter(filters, vectorIDs, true)
 		}
+
+		server := &DataLoaderServer{db: db, vectorFilters: vectorFilters}
+		plan := &browsingStateRequestPlan{
+			AxisOrder: buildCompatAxisOrder(axisX, axisY, axisZ, filters),
+			AxisX:     axisX,
+			AxisY:     axisY,
+			AxisZ:     axisZ,
+			Filters:   filters,
+		}
+		plan, err = server.applyVectorDimensionToPlan(
+			r.Context(),
+			plan,
+			vectorDimensionCfg,
+			vectorBucketID,
+			strings.TrimSpace(req.All) != "",
+			strings.TrimSpace(req.Timeline) != "",
+		)
+		if err != nil {
+			http.Error(w, vectorFilterHTTPMessage(err), mapVectorFilterHTTPStatus(err))
+			return
+		}
+		axisX = plan.AxisX
+		axisY = plan.AxisY
+		axisZ = plan.AxisZ
+		filters = plan.Filters
 
 		// `all` mode: return flat list of medias (do not depend on Timestamp UTC tagset).
 		if strings.TrimSpace(req.All) != "" {
@@ -850,32 +901,18 @@ func GetMetaDataCubeCompatCellHandler(db *sql.DB, vectorFilters *vectorFilterRes
 			return
 		}
 
-		// Browsing state mode: preserve the client's AND/OR semantics by using the old JSON filter format directly.
-		axisOrder := make([]string, 0, 4)
-		if axisX.Type != "" && axisX.Id != -1 {
-			axisOrder = append(axisOrder, "x")
-		}
-		if axisY.Type != "" && axisY.Id != -1 {
-			axisOrder = append(axisOrder, "y")
-		}
-		if axisZ.Type != "" && axisZ.Id != -1 {
-			axisOrder = append(axisOrder, "z")
-		}
-		if len(filters) > 0 {
-			axisOrder = append(axisOrder, "filter")
-		}
-
 		if err := initXYZAxes(r.Context(), db, &axisX, &axisY, &axisZ, "CompatCell(initAxes).exec"); err != nil {
 			http.Error(w, fmt.Sprintf("axis init failed: %v", err), http.StatusBadGateway)
 			return
 		}
 
 		sqlStr := qg.GenerateSQLQueryForState(
-			axisOrder,
+			plan.AxisOrder,
 			axisX.Type, axisX.Id,
 			axisY.Type, axisY.Id,
 			axisZ.Type, axisZ.Id,
 			filters,
+			qg.StateQueryOpts{AxisSubqueries: plan.AxisSubqueries},
 		)
 
 		tx, err := db.BeginTx(r.Context(), &sql.TxOptions{ReadOnly: true})
@@ -945,6 +982,47 @@ func GetMetaDataCubeCompatCellHandler(db *sql.DB, vectorFilters *vectorFilterRes
 			return
 		}
 
+		if len(plan.BucketInfos) > 0 {
+			writeJSON(w, http.StatusOK, compatBrowsingStateEnvelope{
+				BucketInfos: convertCompatBucketInfos(plan.BucketInfos),
+				Cells:       out,
+			})
+			return
+		}
+
 		writeJSON(w, http.StatusOK, out)
 	}
+}
+
+func buildCompatAxisOrder(axisX qg.ParsedAxis, axisY qg.ParsedAxis, axisZ qg.ParsedAxis, filters []qg.ParsedFilter) []string {
+	axisOrder := make([]string, 0, 4)
+	if axisX.Type != "" && axisX.Id != -1 {
+		axisOrder = append(axisOrder, "x")
+	}
+	if axisY.Type != "" && axisY.Id != -1 {
+		axisOrder = append(axisOrder, "y")
+	}
+	if axisZ.Type != "" && axisZ.Id != -1 {
+		axisOrder = append(axisOrder, "z")
+	}
+	if len(filters) > 0 {
+		axisOrder = append(axisOrder, "filter")
+	}
+	return axisOrder
+}
+
+func convertCompatBucketInfos(infos []*pb.BucketInfo) []compatBucketInfo {
+	out := make([]compatBucketInfo, 0, len(infos))
+	for _, info := range infos {
+		if info == nil {
+			continue
+		}
+		out = append(out, compatBucketInfo{
+			BucketID:   info.GetBucketId(),
+			LowerBound: info.GetLowerBound(),
+			UpperBound: info.GetUpperBound(),
+			Label:      info.GetLabel(),
+		})
+	}
+	return out
 }

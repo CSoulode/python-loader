@@ -408,11 +408,43 @@ message VectorFilterConfig {
   float max_distance = 4;
 }
 
+enum BucketStrategy {
+  EQUAL_WIDTH = 0;
+  EQUAL_DEPTH = 1;
+  LOGARITHMIC = 2;
+  CUSTOM = 3;
+}
+
+message BucketConfig {
+  BucketStrategy strategy = 1;
+  int32 count = 2;
+  float dist_min = 3;
+  float dist_max = 4;
+  repeated float custom_breaks = 5;
+}
+
+message VectorSearchDimension {
+  string model_name = 1;
+  VectorReference reference = 2;
+  BucketConfig bucket_cfg = 3;
+  int32 max_results = 4;
+  AxisType axis = 5;
+}
+
+message BucketInfo {
+  int32 bucket_id = 1;
+  float lower_bound = 2;
+  float upper_bound = 3;
+  string label = 4;
+}
+
 message GetBrowsingStateRequest {
   repeated AxisFilter filters = 1;
   string all = 2;
   string timeline = 3;
   VectorFilterConfig vector_filter = 4;
+  VectorSearchDimension vector_dimension = 5;
+  optional int32 vector_bucket_id = 6;
 }
 
 enum FilterValueType {
@@ -447,6 +479,7 @@ message BrowsingStateResponse {
   int32 z = 3;
   int32 count = 4; // The value of the cell, e.g. the
   repeated CubeObject cubeObjects = 5;
+  repeated BucketInfo bucket_infos = 6;
 }
 
 message BrowsingStateChunk {
