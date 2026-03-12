@@ -445,6 +445,7 @@ message GetBrowsingStateRequest {
   VectorFilterConfig vector_filter = 4;
   VectorSearchDimension vector_dimension = 5;
   optional int32 vector_bucket_id = 6;
+  bool rebucket_only = 7;
 }
 
 enum FilterValueType {

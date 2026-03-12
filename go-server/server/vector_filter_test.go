@@ -26,20 +26,26 @@ type stubVectorSearchClient struct {
 	gotGet        *kvstorev1.GetRequest
 	gotKNN        *kvstorev1.KNNRequest
 	gotListModels *kvstorev1.ListModelsRequest
+	getCalls      int
+	knnCalls      int
+	listCalls     int
 }
 
 func (s *stubVectorSearchClient) Get(_ context.Context, req *kvstorev1.GetRequest, _ ...grpc.CallOption) (*kvstorev1.GetResponse, error) {
 	s.gotGet = req
+	s.getCalls++
 	return s.getResp, s.getErr
 }
 
 func (s *stubVectorSearchClient) KNN(_ context.Context, req *kvstorev1.KNNRequest, _ ...grpc.CallOption) (*kvstorev1.KNNResponse, error) {
 	s.gotKNN = req
+	s.knnCalls++
 	return s.knnResp, s.knnErr
 }
 
 func (s *stubVectorSearchClient) ListModels(_ context.Context, req *kvstorev1.ListModelsRequest, _ ...grpc.CallOption) (*kvstorev1.ListModelsResponse, error) {
 	s.gotListModels = req
+	s.listCalls++
 	return s.listModelsResp, s.listModelsErr
 }
 

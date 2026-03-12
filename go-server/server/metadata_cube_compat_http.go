@@ -815,10 +815,14 @@ func queryAllMedias(ctx context.Context, db *sql.DB, axisX, axisY, axisZ qg.Pars
 // GetMetaDataCubeCompatCellHandler serves GET /api/cell and /api/cell/.
 // - If `all` is set (client uses `all=[]`): returns a flat array of media objects: [{id,fileURI,thumbnailURI},...]
 // - Otherwise: returns browsing state cells: [{x,y,z,count,cubeObjects:[{...}]}...]
-func GetMetaDataCubeCompatCellHandler(db *sql.DB, vectorFilters *vectorFilterResolver) http.HandlerFunc {
+func GetMetaDataCubeCompatCellHandler(server *DataLoaderServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if server == nil || server.db == nil {
+			http.Error(w, "server is not configured", http.StatusServiceUnavailable)
 			return
 		}
 
@@ -857,7 +861,7 @@ func GetMetaDataCubeCompatCellHandler(db *sql.DB, vectorFilters *vectorFilterRes
 			return
 		}
 		if vectorFilterCfg != nil {
-			vectorIDs, err := vectorFilters.ResolveObjectIDs(r.Context(), vectorFilterCfg)
+			vectorIDs, err := server.vectorFilters.ResolveObjectIDs(r.Context(), vectorFilterCfg)
 			if err != nil {
 				http.Error(w, vectorFilterHTTPMessage(err), mapVectorFilterHTTPStatus(err))
 				return
@@ -865,7 +869,7 @@ func GetMetaDataCubeCompatCellHandler(db *sql.DB, vectorFilters *vectorFilterRes
 			filters = appendVectorObjectIDFilter(filters, vectorIDs, true)
 		}
 
-		server := &DataLoaderServer{db: db, vectorFilters: vectorFilters}
+		rebucketOnly := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("rebucketOnly")), "true")
 		plan := &browsingStateRequestPlan{
 			AxisOrder: buildCompatAxisOrder(axisX, axisY, axisZ, filters),
 			AxisX:     axisX,
@@ -880,6 +884,7 @@ func GetMetaDataCubeCompatCellHandler(db *sql.DB, vectorFilters *vectorFilterRes
 			vectorBucketID,
 			strings.TrimSpace(req.All) != "",
 			strings.TrimSpace(req.Timeline) != "",
+			rebucketOnly,
 		)
 		if err != nil {
 			http.Error(w, vectorFilterHTTPMessage(err), mapVectorFilterHTTPStatus(err))
@@ -892,7 +897,7 @@ func GetMetaDataCubeCompatCellHandler(db *sql.DB, vectorFilters *vectorFilterRes
 
 		// `all` mode: return flat list of medias (do not depend on Timestamp UTC tagset).
 		if strings.TrimSpace(req.All) != "" {
-			objects, err := queryAllMedias(r.Context(), db, axisX, axisY, axisZ, filters)
+			objects, err := queryAllMedias(r.Context(), server.db, axisX, axisY, axisZ, filters)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("db query failed: %v", err), http.StatusBadGateway)
 				return
@@ -901,7 +906,7 @@ func GetMetaDataCubeCompatCellHandler(db *sql.DB, vectorFilters *vectorFilterRes
 			return
 		}
 
-		if err := initXYZAxes(r.Context(), db, &axisX, &axisY, &axisZ, "CompatCell(initAxes).exec"); err != nil {
+		if err := initXYZAxes(r.Context(), server.db, &axisX, &axisY, &axisZ, "CompatCell(initAxes).exec"); err != nil {
 			http.Error(w, fmt.Sprintf("axis init failed: %v", err), http.StatusBadGateway)
 			return
 		}
@@ -915,7 +920,7 @@ func GetMetaDataCubeCompatCellHandler(db *sql.DB, vectorFilters *vectorFilterRes
 			qg.StateQueryOpts{AxisSubqueries: plan.AxisSubqueries},
 		)
 
-		tx, err := db.BeginTx(r.Context(), &sql.TxOptions{ReadOnly: true})
+		tx, err := server.db.BeginTx(r.Context(), &sql.TxOptions{ReadOnly: true})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("db tx begin failed: %v", err), http.StatusBadGateway)
 			return

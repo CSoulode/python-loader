@@ -3670,6 +3670,7 @@ type GetBrowsingStateRequest struct {
 	VectorFilter    *VectorFilterConfig    `protobuf:"bytes,4,opt,name=vector_filter,json=vectorFilter,proto3" json:"vector_filter,omitempty"`
 	VectorDimension *VectorSearchDimension `protobuf:"bytes,5,opt,name=vector_dimension,json=vectorDimension,proto3" json:"vector_dimension,omitempty"`
 	VectorBucketId  *int32                 `protobuf:"varint,6,opt,name=vector_bucket_id,json=vectorBucketId,proto3,oneof" json:"vector_bucket_id,omitempty"`
+	RebucketOnly    bool                   `protobuf:"varint,7,opt,name=rebucket_only,json=rebucketOnly,proto3" json:"rebucket_only,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -3744,6 +3745,13 @@ func (x *GetBrowsingStateRequest) GetVectorBucketId() int32 {
 		return *x.VectorBucketId
 	}
 	return 0
+}
+
+func (x *GetBrowsingStateRequest) GetRebucketOnly() bool {
+	if x != nil {
+		return x.RebucketOnly
+	}
+	return false
 }
 
 type AxisFilter struct {
@@ -4230,14 +4238,15 @@ const file_dataloader_proto_rawDesc = "" +
 	"lowerBound\x12\x1f\n" +
 	"\vupper_bound\x18\x03 \x01(\x02R\n" +
 	"upperBound\x12\x14\n" +
-	"\x05label\x18\x04 \x01(\tR\x05label\"\xd0\x02\n" +
+	"\x05label\x18\x04 \x01(\tR\x05label\"\xf5\x02\n" +
 	"\x17GetBrowsingStateRequest\x120\n" +
 	"\afilters\x18\x01 \x03(\v2\x16.dataloader.AxisFilterR\afilters\x12\x10\n" +
 	"\x03all\x18\x02 \x01(\tR\x03all\x12\x1a\n" +
 	"\btimeline\x18\x03 \x01(\tR\btimeline\x12C\n" +
 	"\rvector_filter\x18\x04 \x01(\v2\x1e.dataloader.VectorFilterConfigR\fvectorFilter\x12L\n" +
 	"\x10vector_dimension\x18\x05 \x01(\v2!.dataloader.VectorSearchDimensionR\x0fvectorDimension\x12-\n" +
-	"\x10vector_bucket_id\x18\x06 \x01(\x05H\x00R\x0evectorBucketId\x88\x01\x01B\x13\n" +
+	"\x10vector_bucket_id\x18\x06 \x01(\x05H\x00R\x0evectorBucketId\x88\x01\x01\x12#\n" +
+	"\rrebucket_only\x18\a \x01(\bR\frebucketOnlyB\x13\n" +
 	"\x11_vector_bucket_id\"\x9b\x01\n" +
 	"\n" +
 	"AxisFilter\x12<\n" +

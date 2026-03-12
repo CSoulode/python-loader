@@ -15,6 +15,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -29,9 +30,13 @@ const phaseATestDatabaseEnv = "PHASE_A_TEST_DATABASE_URL"
 
 type fakeVectorKVServer struct {
 	kvstorev1.UnimplementedVectorKVServer
+	getCalls        int32
+	knnCalls        int32
+	listModelsCalls int32
 }
 
 func (s *fakeVectorKVServer) Get(_ context.Context, req *kvstorev1.GetRequest) (*kvstorev1.GetResponse, error) {
+	atomic.AddInt32(&s.getCalls, 1)
 	if req.GetModel() != "siglip2" {
 		return nil, fmt.Errorf("unexpected model %q", req.GetModel())
 	}
@@ -44,6 +49,7 @@ func (s *fakeVectorKVServer) Get(_ context.Context, req *kvstorev1.GetRequest) (
 }
 
 func (s *fakeVectorKVServer) KNN(_ context.Context, req *kvstorev1.KNNRequest) (*kvstorev1.KNNResponse, error) {
+	atomic.AddInt32(&s.knnCalls, 1)
 	if req.GetModel() != "siglip2" {
 		return nil, fmt.Errorf("unexpected model %q", req.GetModel())
 	}
@@ -70,6 +76,7 @@ func (s *fakeVectorKVServer) KNN(_ context.Context, req *kvstorev1.KNNRequest) (
 }
 
 func (s *fakeVectorKVServer) ListModels(_ context.Context, _ *kvstorev1.ListModelsRequest) (*kvstorev1.ListModelsResponse, error) {
+	atomic.AddInt32(&s.listModelsCalls, 1)
 	return &kvstorev1.ListModelsResponse{
 		DefaultModel: "siglip2",
 		Models: []*kvstorev1.ModelInfo{{
@@ -81,9 +88,22 @@ func (s *fakeVectorKVServer) ListModels(_ context.Context, _ *kvstorev1.ListMode
 	}, nil
 }
 
+func (s *fakeVectorKVServer) GetCallCount() int32 {
+	return atomic.LoadInt32(&s.getCalls)
+}
+
+func (s *fakeVectorKVServer) KNNCallCount() int32 {
+	return atomic.LoadInt32(&s.knnCalls)
+}
+
+func (s *fakeVectorKVServer) ListModelsCallCount() int32 {
+	return atomic.LoadInt32(&s.listModelsCalls)
+}
+
 type phaseATestEnv struct {
 	db         *sql.DB
 	server     *DataLoaderServer
+	vectorKV   *fakeVectorKVServer
 	grpcClient pb.DataLoaderClient
 	httpServer *httptest.Server
 	cleanup    func()
@@ -292,23 +312,23 @@ func TestPhaseBVectorDimensionEndToEndGRPCAndHTTP(t *testing.T) {
 	})
 }
 
-func setupPhaseATestEnv(t *testing.T, dbURL string) *phaseATestEnv {
-	t.Helper()
+func setupPhaseATestEnv(tb testing.TB, dbURL string) *phaseATestEnv {
+	tb.Helper()
 
-	adminDB := openTestDB(t, adminDatabaseURL(t, dbURL))
+	adminDB := openTestDB(tb, adminDatabaseURL(tb, dbURL))
 	dbName := fmt.Sprintf("phase_a_%d_%d", time.Now().UnixNano(), rand.Intn(1000))
 	if _, err := adminDB.Exec(`CREATE DATABASE "` + dbName + `"`); err != nil {
-		t.Fatalf("create test database: %v", err)
+		tb.Fatalf("create test database: %v", err)
 	}
 
-	testDBURL := replaceDatabaseName(t, dbURL, dbName)
-	testDB := openTestDB(t, testDBURL)
-	setupPhaseATestDatabase(t, testDB)
+	testDBURL := replaceDatabaseName(tb, dbURL, dbName)
+	testDB := openTestDB(tb, testDBURL)
+	setupPhaseATestDatabase(tb, testDB)
 
-	vectorAddr, stopVector := startFakeVectorKV(t)
+	vectorAddr, vectorKV, stopVector := startFakeVectorKV(tb)
 	resolver, conn, err := newVectorFilterResolverFromAddress(context.Background(), vectorAddr)
 	if err != nil {
-		t.Fatalf("newVectorFilterResolverFromAddress: %v", err)
+		tb.Fatalf("newVectorFilterResolverFromAddress: %v", err)
 	}
 
 	server := &DataLoaderServer{
@@ -317,73 +337,77 @@ func setupPhaseATestEnv(t *testing.T, dbURL string) *phaseATestEnv {
 		vectorConn:    conn,
 	}
 
-	grpcClient, stopGRPC := startDataLoaderGRPC(t, server)
-	httpServer := httptest.NewServer(GetMetaDataCubeCompatCellHandler(server.db, server.vectorFilters))
+	grpcClient, stopGRPC := startDataLoaderGRPC(tb, server)
+	httpMux := http.NewServeMux()
+	httpMux.HandleFunc("/", GetMetaDataCubeCompatCellHandler(server))
+	httpMux.HandleFunc("/api/vector/models", GetVectorModelsHandler(server))
+	httpServer := httptest.NewServer(httpMux)
 
 	cleanup := func() {
 		httpServer.Close()
 		stopGRPC()
 		stopVector()
 		server.Close()
-		dropTestDatabase(t, adminDB, dbName)
+		dropTestDatabase(tb, adminDB, dbName)
 		adminDB.Close()
 	}
 
 	return &phaseATestEnv{
 		db:         testDB,
 		server:     server,
+		vectorKV:   vectorKV,
 		grpcClient: grpcClient,
 		httpServer: httpServer,
 		cleanup:    cleanup,
 	}
 }
 
-func openTestDB(t *testing.T, dsn string) *sql.DB {
-	t.Helper()
+func openTestDB(tb testing.TB, dsn string) *sql.DB {
+	tb.Helper()
 
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		t.Fatalf("sql.Open(%q): %v", dsn, err)
+		tb.Fatalf("sql.Open(%q): %v", dsn, err)
 	}
 	if err := db.Ping(); err != nil {
-		t.Fatalf("db.Ping(%q): %v", dsn, err)
+		tb.Fatalf("db.Ping(%q): %v", dsn, err)
 	}
 	return db
 }
 
-func adminDatabaseURL(t *testing.T, dbURL string) string {
-	t.Helper()
-	return replaceDatabaseName(t, dbURL, "postgres")
+func adminDatabaseURL(tb testing.TB, dbURL string) string {
+	tb.Helper()
+	return replaceDatabaseName(tb, dbURL, "postgres")
 }
 
-func replaceDatabaseName(t *testing.T, rawURL string, dbName string) string {
-	t.Helper()
+func replaceDatabaseName(tb testing.TB, rawURL string, dbName string) string {
+	tb.Helper()
 
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		t.Fatalf("parse database url: %v", err)
+		tb.Fatalf("parse database url: %v", err)
 	}
 	parsed.Path = "/" + dbName
 	return parsed.String()
 }
 
-func dropTestDatabase(t *testing.T, adminDB *sql.DB, dbName string) {
-	t.Helper()
+func dropTestDatabase(tb testing.TB, adminDB *sql.DB, dbName string) {
+	tb.Helper()
 
 	if _, err := adminDB.Exec(`
 SELECT pg_terminate_backend(pid)
 FROM pg_stat_activity
 WHERE datname = $1 AND pid <> pg_backend_pid()
 `, dbName); err != nil {
-		t.Fatalf("terminate test database connections: %v", err)
+		tb.Fatalf("terminate test database connections: %v", err)
 	}
 	if _, err := adminDB.Exec(`DROP DATABASE "` + dbName + `"`); err != nil {
-		t.Fatalf("drop test database: %v", err)
+		tb.Fatalf("drop test database: %v", err)
 	}
 }
 
-func setupPhaseATestDatabase(t *testing.T, db *sql.DB) {
-	t.Helper()
+func setupPhaseATestDatabase(tb testing.TB, db *sql.DB) {
+	tb.Helper()
 
 	statements := []string{
 		`CREATE TABLE public.medias (id integer PRIMARY KEY, file_uri text NOT NULL, file_type integer NOT NULL, thumbnail_uri text)`,
@@ -411,39 +435,40 @@ func setupPhaseATestDatabase(t *testing.T, db *sql.DB) {
 
 	for _, stmt := range statements {
 		if _, err := db.Exec(stmt); err != nil {
-			t.Fatalf("setup statement failed: %v\n%s", err, stmt)
+			tb.Fatalf("setup statement failed: %v\n%s", err, stmt)
 		}
 	}
 }
 
-func startFakeVectorKV(t *testing.T) (string, func()) {
-	t.Helper()
+func startFakeVectorKV(tb testing.TB) (string, *fakeVectorKVServer, func()) {
+	tb.Helper()
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		t.Fatalf("listen vectorkv: %v", err)
+		tb.Fatalf("listen vectorkv: %v", err)
 	}
 
 	srv := grpc.NewServer()
-	kvstorev1.RegisterVectorKVServer(srv, &fakeVectorKVServer{})
+	handler := &fakeVectorKVServer{}
+	kvstorev1.RegisterVectorKVServer(srv, handler)
 	go func() {
 		if err := srv.Serve(listener); err != nil && !strings.Contains(err.Error(), "closed network connection") {
 			panic(err)
 		}
 	}()
 
-	return listener.Addr().String(), func() {
+	return listener.Addr().String(), handler, func() {
 		srv.Stop()
 		_ = listener.Close()
 	}
 }
 
-func startDataLoaderGRPC(t *testing.T, server *DataLoaderServer) (pb.DataLoaderClient, func()) {
-	t.Helper()
+func startDataLoaderGRPC(tb testing.TB, server *DataLoaderServer) (pb.DataLoaderClient, func()) {
+	tb.Helper()
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		t.Fatalf("listen dataloader: %v", err)
+		tb.Fatalf("listen dataloader: %v", err)
 	}
 
 	srv := grpc.NewServer()
@@ -456,7 +481,7 @@ func startDataLoaderGRPC(t *testing.T, server *DataLoaderServer) (pb.DataLoaderC
 
 	conn, err := grpc.Dial(listener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		t.Fatalf("dial dataloader: %v", err)
+		tb.Fatalf("dial dataloader: %v", err)
 	}
 
 	return pb.NewDataLoaderClient(conn), func() {

@@ -520,11 +520,11 @@ func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesIncrementalGrouping(
 
 	// ---------- Parse request params ----------
 	plan, err := s.parseBrowsingStateRequest(ctx, req)
-	if plan == nil {
-		return fmt.Errorf("invalid axis filter order")
-	}
 	if err != nil {
 		return err
+	}
+	if plan == nil {
+		return fmt.Errorf("invalid axis filter order")
 	}
 	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
 	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
@@ -707,11 +707,11 @@ func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesFull(
 	ctx := stream.Context()
 	// ---------- Parse request params ----------
 	plan, err := s.parseBrowsingStateRequest(ctx, req)
-	if plan == nil {
-		return fmt.Errorf("invalid axis filter order")
-	}
 	if err != nil {
 		return err
+	}
+	if plan == nil {
+		return fmt.Errorf("invalid axis filter order")
 	}
 	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
 	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
@@ -936,11 +936,11 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesSingles(
 	ctx := stream.Context()
 
 	plan, err := s.parseBrowsingStateRequest(ctx, req)
-	if plan == nil {
-		return fmt.Errorf("invalid axis filter order")
-	}
 	if err != nil {
 		return err
+	}
+	if plan == nil {
+		return fmt.Errorf("invalid axis filter order")
 	}
 	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
 	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
@@ -1099,11 +1099,11 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesDeduplicatedSingle
 	dedupInSender := false
 
 	plan, err := s.parseBrowsingStateRequest(ctx, req)
-	if plan == nil {
-		return fmt.Errorf("invalid axis filter order")
-	}
 	if err != nil {
 		return err
+	}
+	if plan == nil {
+		return fmt.Errorf("invalid axis filter order")
 	}
 	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
 	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
@@ -1335,11 +1335,11 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesFull(
 
 	// ---------- Parse request params ----------
 	plan, err := s.parseBrowsingStateRequest(ctx, req)
-	if plan == nil {
-		return fmt.Errorf("invalid axis filter order")
-	}
 	if err != nil {
 		return err
+	}
+	if plan == nil {
+		return fmt.Errorf("invalid axis filter order")
 	}
 	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
 	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
@@ -1567,11 +1567,11 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesIncrementalGroupin
 	ctx := stream.Context()
 
 	plan, err := s.parseBrowsingStateRequest(ctx, req)
-	if plan == nil {
-		return fmt.Errorf("invalid axis filter order")
-	}
 	if err != nil {
 		return err
+	}
+	if plan == nil {
+		return fmt.Errorf("invalid axis filter order")
 	}
 	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
 	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
@@ -1748,12 +1748,11 @@ scanLoop:
 func (s *DataLoaderServer) GetBrowsingState(req *pb.GetBrowsingStateRequest, stream pb.DataLoader_GetBrowsingStateServer) error {
 	// ---------- Parse request params ----------
 	plan, err := s.parseBrowsingStateRequest(stream.Context(), req)
-
-	if plan == nil {
-		return fmt.Errorf("invalid axis filter order")
-	}
 	if err != nil {
 		return err
+	}
+	if plan == nil {
+		return fmt.Errorf("invalid axis filter order")
 	}
 	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
 	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
@@ -1875,11 +1874,11 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 
 	// ---------- Parse request params ----------
 	plan, err := s.parseBrowsingStateRequest(ctx, req)
-	if plan == nil {
-		return fmt.Errorf("invalid axis filter order")
-	}
 	if err != nil {
 		return err
+	}
+	if plan == nil {
+		return fmt.Errorf("invalid axis filter order")
 	}
 	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
 	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)

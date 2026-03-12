@@ -82,11 +82,30 @@ func validateVectorFilterConfig(cfg *pb.VectorFilterConfig) error {
 	if cfg.GetReference() == nil {
 		return status.Error(codes.InvalidArgument, "vector_filter.reference is required")
 	}
+	if err := validateVectorReference(cfg.GetReference(), "vector_filter.reference"); err != nil {
+		return err
+	}
 	if cfg.GetK() <= 0 {
 		return status.Error(codes.InvalidArgument, "vector_filter.k must be > 0")
 	}
 	if cfg.GetMaxDistance() < 0 {
 		return status.Error(codes.InvalidArgument, "vector_filter.max_distance must be >= 0")
+	}
+	return nil
+}
+
+func validateVectorReference(ref *pb.VectorReference, fieldName string) error {
+	switch value := ref.GetRef().(type) {
+	case *pb.VectorReference_ObjectId:
+		if value.ObjectId <= 0 {
+			return status.Errorf(codes.InvalidArgument, "%s.object_id must be > 0", fieldName)
+		}
+	case *pb.VectorReference_RawEmbedding:
+		if len(value.RawEmbedding.GetValues()) == 0 {
+			return status.Errorf(codes.InvalidArgument, "%s.raw_embedding must not be empty", fieldName)
+		}
+	default:
+		return status.Errorf(codes.InvalidArgument, "%s must set object_id or raw_embedding", fieldName)
 	}
 	return nil
 }
@@ -178,8 +197,10 @@ func mapVectorFilterHTTPStatus(err error) int {
 		return http.StatusNotFound
 	case codes.DeadlineExceeded:
 		return http.StatusGatewayTimeout
+	case codes.FailedPrecondition:
+		return http.StatusConflict
 	case codes.Unavailable:
-		return http.StatusBadGateway
+		return http.StatusServiceUnavailable
 	default:
 		return http.StatusBadGateway
 	}
@@ -262,7 +283,15 @@ func (s *DataLoaderServer) parseBrowsingStateRequest(
 		AxisZ:     axisZ,
 		Filters:   filters,
 	}
-	return s.applyVectorDimensionToPlan(ctx, plan, req.GetVectorDimension(), req.VectorBucketId, strings.TrimSpace(req.GetAll()) != "", strings.TrimSpace(req.GetTimeline()) != "")
+	return s.applyVectorDimensionToPlan(
+		ctx,
+		plan,
+		req.GetVectorDimension(),
+		req.VectorBucketId,
+		strings.TrimSpace(req.GetAll()) != "",
+		strings.TrimSpace(req.GetTimeline()) != "",
+		req.GetRebucketOnly(),
+	)
 }
 
 func (s *DataLoaderServer) resolveRequestVectorFilter(
@@ -301,18 +330,16 @@ func (s *DataLoaderServer) applyVectorDimensionToPlan(
 	vectorBucketID *int32,
 	allDefined bool,
 	timelineDefined bool,
+	rebucketOnly bool,
 ) (*browsingStateRequestPlan, error) {
+	if err := validateVectorDimensionRequestUsage(vectorDimension, vectorBucketID, allDefined, timelineDefined, rebucketOnly); err != nil {
+		return nil, err
+	}
 	if vectorDimension == nil {
-		if vectorBucketID != nil {
-			return nil, status.Error(codes.InvalidArgument, "vector_bucket_id requires vector_dimension")
-		}
 		return plan, nil
 	}
-	if timelineDefined {
-		return nil, status.Error(codes.InvalidArgument, "vector_dimension is not supported with timeline requests")
-	}
 
-	result, err := s.handleVectorDimension(ctx, vectorDimension)
+	result, err := s.resolveVectorDimensionWithCache(ctx, vectorDimension, rebucketOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -335,6 +362,9 @@ func (s *DataLoaderServer) applyVectorDimensionToPlan(
 		return nil, status.Error(codes.InvalidArgument, "vector_bucket_id is only valid when all and vector_dimension are both provided")
 	}
 
+	if plan.AxisSubqueries == nil {
+		plan.AxisSubqueries = make(map[string]string, 1)
+	}
 	axisKey := axisToken(result.AxisType)
 	if axisKey == "" {
 		return nil, status.Error(codes.InvalidArgument, "vector_dimension.axis must be X_AXIS, Y_AXIS, or Z_AXIS")
@@ -345,9 +375,46 @@ func (s *DataLoaderServer) applyVectorDimensionToPlan(
 
 	setAxisByToken(plan, axisKey, result.ParsedAxis)
 	plan.AxisOrder = ensureAxisOrder(plan.AxisOrder, axisKey)
-	plan.AxisSubqueries = map[string]string{axisKey: result.AxisSQL}
+	plan.AxisSubqueries[axisKey] = result.AxisSQL
 	plan.BucketInfos = cloneBucketInfos(result.BucketInfos)
 	return plan, nil
+}
+
+func validateVectorDimensionRequestUsage(
+	vectorDimension *pb.VectorSearchDimension,
+	vectorBucketID *int32,
+	allDefined bool,
+	timelineDefined bool,
+	rebucketOnly bool,
+) error {
+	if vectorDimension == nil {
+		if vectorBucketID != nil {
+			return status.Error(codes.InvalidArgument, "vector_bucket_id requires vector_dimension")
+		}
+		if rebucketOnly {
+			return status.Error(codes.InvalidArgument, "rebucket_only requires vector_dimension")
+		}
+		return nil
+	}
+	if timelineDefined {
+		return status.Error(codes.InvalidArgument, "vector_dimension is not supported with timeline requests")
+	}
+	if rebucketOnly && allDefined {
+		return status.Error(codes.InvalidArgument, "rebucket_only is not supported with all requests")
+	}
+	if allDefined {
+		if vectorBucketID == nil {
+			return status.Error(codes.InvalidArgument, "vector_bucket_id must be set when all and vector_dimension are both provided")
+		}
+		if *vectorBucketID < 0 {
+			return status.Error(codes.InvalidArgument, "vector_bucket_id must be >= 0")
+		}
+		return nil
+	}
+	if vectorBucketID != nil {
+		return status.Error(codes.InvalidArgument, "vector_bucket_id is only valid when all and vector_dimension are both provided")
+	}
+	return nil
 }
 
 func axisToken(axisType pb.AxisType) string {

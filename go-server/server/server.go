@@ -50,6 +50,7 @@ type DataLoaderServer struct {
 	db            *sql.DB
 	vectorFilters *vectorFilterResolver
 	vectorConn    *grpc.ClientConn
+	vectorCache   *VectorSearchCache
 }
 
 func NewDataLoaderServer(ctx context.Context, dbConnStr string, vectorAddr string) (*DataLoaderServer, error) {
@@ -75,6 +76,7 @@ func NewDataLoaderServer(ctx context.Context, dbConnStr string, vectorAddr strin
 		db:            db,
 		vectorFilters: vectorFilters,
 		vectorConn:    vectorConn,
+		vectorCache:   newVectorSearchCache(defaultVectorCacheMaxEntries, defaultVectorCacheTTL),
 	}, nil
 }
 
@@ -447,8 +449,9 @@ func main() {
 	httpMux.HandleFunc("/api/node/{id}/children", GetMetaDataCubeCompatNodeChildrenHandler(server.db))
 	httpMux.HandleFunc("/api/node/{id}/Children", GetMetaDataCubeCompatNodeChildrenHandler(server.db))
 	httpMux.HandleFunc("/api/cubeobject/{id}/tags", GetMetaDataCubeCompatCubeObjectTagsHandler(server.db))
-	httpMux.HandleFunc("/api/cell", GetMetaDataCubeCompatCellHandler(server.db, server.vectorFilters))
-	httpMux.HandleFunc("/api/cell/", GetMetaDataCubeCompatCellHandler(server.db, server.vectorFilters))
+	httpMux.HandleFunc("/api/vector/models", GetVectorModelsHandler(server))
+	httpMux.HandleFunc("/api/cell", GetMetaDataCubeCompatCellHandler(server))
+	httpMux.HandleFunc("/api/cell/", GetMetaDataCubeCompatCellHandler(server))
 
 	// 5) Fallback to the generated gateway for everything else
 	httpMux.Handle("/", gwMux)
