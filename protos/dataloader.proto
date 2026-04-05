@@ -415,6 +415,13 @@ enum BucketStrategy {
   CUSTOM = 3;
 }
 
+enum HybridStrategy {
+  AUTO = 0;
+  POST_FILTER = 1;
+  PRE_FILTER = 2;
+  HYBRID = 3;
+}
+
 message BucketConfig {
   BucketStrategy strategy = 1;
   int32 count = 2;
@@ -446,6 +453,7 @@ message GetBrowsingStateRequest {
   VectorSearchDimension vector_dimension = 5;
   optional int32 vector_bucket_id = 6;
   bool rebucket_only = 7;
+  HybridStrategy hybrid_strategy = 8;
 }
 
 enum FilterValueType {

@@ -430,6 +430,38 @@ func BuildAxisObjectIDSQLForState(axisType string, vertexID int) (string, error)
 	}
 }
 
+func GenerateCandidateObjectIDs(filters []ParsedFilter, axes []ParsedAxis) (string, error) {
+	branches := make([]string, 0, len(filters)+len(axes))
+	for _, axis := range axes {
+		if strings.TrimSpace(axis.Type) == "" {
+			continue
+		}
+
+		sql, err := BuildAxisObjectIDSQLForState(axis.Type, axis.Id)
+		if err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(sql) == "" {
+			continue
+		}
+		branches = append(branches, sql)
+	}
+	for _, filter := range filters {
+		sql, err := BuildFilterIDSQL(filter)
+		if err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(sql) == "" {
+			continue
+		}
+		branches = append(branches, sql)
+	}
+	if len(branches) == 0 {
+		return "", nil
+	}
+	return strings.Join(branches, "\nINTERSECT\n"), nil
+}
+
 // Existing BuildFilterIDSQL works (filters intersect on object_id).
 // (We reuse your earlier BuildFilterIDSQL; if you didn’t keep it, copy from previous message.)
 

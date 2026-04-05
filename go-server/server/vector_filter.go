@@ -23,6 +23,7 @@ const vectorDialTimeout = 5 * time.Second
 type vectorSearchClient interface {
 	Get(context.Context, *kvstorev1.GetRequest, ...grpc.CallOption) (*kvstorev1.GetResponse, error)
 	KNN(context.Context, *kvstorev1.KNNRequest, ...grpc.CallOption) (*kvstorev1.KNNResponse, error)
+	FilteredKNN(context.Context, *kvstorev1.FilteredKNNRequest, ...grpc.CallOption) (*kvstorev1.KNNResponse, error)
 	ListModels(context.Context, *kvstorev1.ListModelsRequest, ...grpc.CallOption) (*kvstorev1.ListModelsResponse, error)
 }
 
@@ -260,6 +261,10 @@ func (s *DataLoaderServer) parseBrowsingStateRequest(
 	if req.GetVectorFilter() != nil && req.GetVectorDimension() != nil {
 		return nil, status.Error(codes.InvalidArgument, "vector_filter and vector_dimension cannot be used together")
 	}
+	forcedStrategy, err := strategyFromProto(req.GetHybridStrategy())
+	if err != nil {
+		return nil, err
+	}
 
 	axisOrder, axisX, axisY, axisZ, filters, err := parseAxesAndFilters(req)
 	if err != nil {
@@ -291,6 +296,7 @@ func (s *DataLoaderServer) parseBrowsingStateRequest(
 		strings.TrimSpace(req.GetAll()) != "",
 		strings.TrimSpace(req.GetTimeline()) != "",
 		req.GetRebucketOnly(),
+		forcedStrategy,
 	)
 }
 
@@ -331,15 +337,38 @@ func (s *DataLoaderServer) applyVectorDimensionToPlan(
 	allDefined bool,
 	timelineDefined bool,
 	rebucketOnly bool,
+	forcedStrategy HybridStrategy,
 ) (*browsingStateRequestPlan, error) {
-	if err := validateVectorDimensionRequestUsage(vectorDimension, vectorBucketID, allDefined, timelineDefined, rebucketOnly); err != nil {
+	if err := validateVectorDimensionRequestUsage(
+		vectorDimension,
+		vectorBucketID,
+		allDefined,
+		timelineDefined,
+		rebucketOnly,
+		forcedStrategy,
+	); err != nil {
 		return nil, err
 	}
 	if vectorDimension == nil {
 		return plan, nil
 	}
 
-	result, err := s.resolveVectorDimensionWithCache(ctx, vectorDimension, rebucketOnly)
+	axisKey := axisToken(vectorDimension.GetAxis())
+	if axisKey == "" {
+		return nil, status.Error(codes.InvalidArgument, "vector_dimension.axis must be X_AXIS, Y_AXIS, or Z_AXIS")
+	}
+	if currentAxis := selectAxisByToken(plan, axisKey); currentAxis.Type != "" {
+		return nil, status.Errorf(codes.InvalidArgument, "vector_dimension.axis conflicts with an existing %s axis", axisKey)
+	}
+
+	result, err := s.resolveVectorDimensionForMetadata(
+		ctx,
+		vectorDimension,
+		plan.Filters,
+		metadataAxesFromPlan(plan),
+		rebucketOnly,
+		forcedStrategy,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -365,14 +394,6 @@ func (s *DataLoaderServer) applyVectorDimensionToPlan(
 	if plan.AxisSubqueries == nil {
 		plan.AxisSubqueries = make(map[string]string, 1)
 	}
-	axisKey := axisToken(result.AxisType)
-	if axisKey == "" {
-		return nil, status.Error(codes.InvalidArgument, "vector_dimension.axis must be X_AXIS, Y_AXIS, or Z_AXIS")
-	}
-	if currentAxis := selectAxisByToken(plan, axisKey); currentAxis.Type != "" {
-		return nil, status.Errorf(codes.InvalidArgument, "vector_dimension.axis conflicts with an existing %s axis", axisKey)
-	}
-
 	setAxisByToken(plan, axisKey, result.ParsedAxis)
 	plan.AxisOrder = ensureAxisOrder(plan.AxisOrder, axisKey)
 	plan.AxisSubqueries[axisKey] = result.AxisSQL
@@ -386,6 +407,7 @@ func validateVectorDimensionRequestUsage(
 	allDefined bool,
 	timelineDefined bool,
 	rebucketOnly bool,
+	forcedStrategy HybridStrategy,
 ) error {
 	if vectorDimension == nil {
 		if vectorBucketID != nil {
@@ -393,6 +415,9 @@ func validateVectorDimensionRequestUsage(
 		}
 		if rebucketOnly {
 			return status.Error(codes.InvalidArgument, "rebucket_only requires vector_dimension")
+		}
+		if forcedStrategy != Auto {
+			return status.Error(codes.InvalidArgument, "hybrid_strategy requires vector_dimension")
 		}
 		return nil
 	}

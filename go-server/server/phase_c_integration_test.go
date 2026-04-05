@@ -40,18 +40,27 @@ func phaseCRebucketVectorDimension(strategy pb.BucketStrategy) *pb.VectorSearchD
 	return cfg
 }
 
-func phaseCSeedCache(t *testing.T, env *phaseATestEnv) {
+func phaseCSeedCacheWithFilters(t *testing.T, env *phaseATestEnv, filters []*pb.AxisFilter) {
 	t.Helper()
 
 	responses := collectBrowsingStateResponses(t, env.grpcClient, &pb.GetBrowsingStateRequest{
-		Filters: []*pb.AxisFilter{{
-			AxisFilterType: pb.AxisType_X_AXIS,
-			Value:          1,
-			ValueType:      pb.FilterValueType_TAGSET,
-		}},
+		Filters:         filters,
 		VectorDimension: phaseCSeedVectorDimension(),
 	})
 	assertBucketInfosOnFirstResponse(t, responses, 2)
+}
+
+func phaseCSeedCache(t *testing.T, env *phaseATestEnv) {
+	t.Helper()
+	phaseCSeedCacheWithFilters(t, env, []*pb.AxisFilter{{
+		AxisFilterType: pb.AxisType_X_AXIS,
+		Value:          1,
+		ValueType:      pb.FilterValueType_TAGSET,
+	}})
+}
+
+func totalVectorSearchCalls(env *phaseATestEnv) int32 {
+	return env.vectorKV.KNNCallCount() + env.vectorKV.FilteredKNNCallCount()
 }
 
 func TestPhaseCRebucketOnlyAllGRPCVariants2DAnd3D(t *testing.T) {
@@ -64,8 +73,12 @@ func TestPhaseCRebucketOnlyAllGRPCVariants2DAnd3D(t *testing.T) {
 	defer env.cleanup()
 
 	phaseCSeedCache(t, env)
+	phaseCSeedCacheWithFilters(t, env, []*pb.AxisFilter{
+		{AxisFilterType: pb.AxisType_X_AXIS, Value: 1, ValueType: pb.FilterValueType_TAGSET},
+		{AxisFilterType: pb.AxisType_Z_AXIS, Value: 2, ValueType: pb.FilterValueType_TAGSET},
+	})
 	seedGet := env.vectorKV.GetCallCount()
-	seedKNN := env.vectorKV.KNNCallCount()
+	seedSearch := totalVectorSearchCalls(env)
 	seedList := env.vectorKV.ListModelsCallCount()
 
 	req2D := &pb.GetBrowsingStateRequest{
@@ -106,11 +119,11 @@ func TestPhaseCRebucketOnlyAllGRPCVariants2DAnd3D(t *testing.T) {
 		})
 	}
 
-	if env.vectorKV.GetCallCount() != seedGet || env.vectorKV.KNNCallCount() != seedKNN || env.vectorKV.ListModelsCallCount() != seedList {
+	if env.vectorKV.GetCallCount() != seedGet || totalVectorSearchCalls(env) != seedSearch || env.vectorKV.ListModelsCallCount() != seedList {
 		t.Fatalf(
-			"rebucket-only variant coverage should not trigger vectorkv RPCs: get=%d/%d knn=%d/%d list=%d/%d",
+			"rebucket-only variant coverage should not trigger vectorkv RPCs: get=%d/%d search=%d/%d list=%d/%d",
 			env.vectorKV.GetCallCount(), seedGet,
-			env.vectorKV.KNNCallCount(), seedKNN,
+			totalVectorSearchCalls(env), seedSearch,
 			env.vectorKV.ListModelsCallCount(), seedList,
 		)
 	}
@@ -125,9 +138,12 @@ func TestPhaseCRebucketOnlyHTTP3DEnvelope(t *testing.T) {
 	env := setupPhaseATestEnv(t, dbURL)
 	defer env.cleanup()
 
-	phaseCSeedCache(t, env)
+	phaseCSeedCacheWithFilters(t, env, []*pb.AxisFilter{
+		{AxisFilterType: pb.AxisType_X_AXIS, Value: 1, ValueType: pb.FilterValueType_TAGSET},
+		{AxisFilterType: pb.AxisType_Z_AXIS, Value: 2, ValueType: pb.FilterValueType_TAGSET},
+	})
 	seedGet := env.vectorKV.GetCallCount()
-	seedKNN := env.vectorKV.KNNCallCount()
+	seedSearch := totalVectorSearchCalls(env)
 	seedList := env.vectorKV.ListModelsCallCount()
 
 	params := url.Values{}
@@ -145,11 +161,11 @@ func TestPhaseCRebucketOnlyHTTP3DEnvelope(t *testing.T) {
 		"1:1:1": {count: 1, representativeID: 1},
 		"2:2:2": {count: 1, representativeID: 2},
 	})
-	if env.vectorKV.GetCallCount() != seedGet || env.vectorKV.KNNCallCount() != seedKNN || env.vectorKV.ListModelsCallCount() != seedList {
+	if env.vectorKV.GetCallCount() != seedGet || totalVectorSearchCalls(env) != seedSearch || env.vectorKV.ListModelsCallCount() != seedList {
 		t.Fatalf(
-			"http rebucket-only 3d should not trigger vectorkv RPCs: get=%d/%d knn=%d/%d list=%d/%d",
+			"http rebucket-only 3d should not trigger vectorkv RPCs: get=%d/%d search=%d/%d list=%d/%d",
 			env.vectorKV.GetCallCount(), seedGet,
-			env.vectorKV.KNNCallCount(), seedKNN,
+			totalVectorSearchCalls(env), seedSearch,
 			env.vectorKV.ListModelsCallCount(), seedList,
 		)
 	}
@@ -165,8 +181,8 @@ func TestPhaseCRebucketOnlyUsesSharedCacheAcrossGRPCAndHTTP(t *testing.T) {
 	defer env.cleanup()
 
 	phaseCSeedCache(t, env)
-	if env.vectorKV.KNNCallCount() != 1 || env.vectorKV.GetCallCount() != 1 || env.vectorKV.ListModelsCallCount() != 1 {
-		t.Fatalf("unexpected seed RPC counts: get=%d knn=%d list=%d", env.vectorKV.GetCallCount(), env.vectorKV.KNNCallCount(), env.vectorKV.ListModelsCallCount())
+	if totalVectorSearchCalls(env) != 1 || env.vectorKV.GetCallCount() != 1 || env.vectorKV.ListModelsCallCount() != 1 {
+		t.Fatalf("unexpected seed RPC counts: get=%d search=%d list=%d", env.vectorKV.GetCallCount(), totalVectorSearchCalls(env), env.vectorKV.ListModelsCallCount())
 	}
 
 	httpParams := url.Values{}
@@ -179,8 +195,8 @@ func TestPhaseCRebucketOnlyUsesSharedCacheAcrossGRPCAndHTTP(t *testing.T) {
 	if len(envelope.BucketInfos) != 1 {
 		t.Fatalf("bucket infos = %d, want 1", len(envelope.BucketInfos))
 	}
-	if env.vectorKV.KNNCallCount() != 1 || env.vectorKV.GetCallCount() != 1 || env.vectorKV.ListModelsCallCount() != 1 {
-		t.Fatalf("rebucketOnly should not trigger RPCs: get=%d knn=%d list=%d", env.vectorKV.GetCallCount(), env.vectorKV.KNNCallCount(), env.vectorKV.ListModelsCallCount())
+	if totalVectorSearchCalls(env) != 1 || env.vectorKV.GetCallCount() != 1 || env.vectorKV.ListModelsCallCount() != 1 {
+		t.Fatalf("rebucketOnly should not trigger RPCs: get=%d search=%d list=%d", env.vectorKV.GetCallCount(), totalVectorSearchCalls(env), env.vectorKV.ListModelsCallCount())
 	}
 }
 

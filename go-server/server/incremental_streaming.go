@@ -262,6 +262,7 @@ func RunKeyFlusherWithMetrics(
 		pendingCap = 65536
 	}
 	pending := make(map[cellKey]struct{}, pendingCap)
+	batchIdx := 0
 
 	ticker := time.NewTicker(flushInterval)
 	defer ticker.Stop()
@@ -280,6 +281,7 @@ func RunKeyFlusherWithMetrics(
 		}
 
 		snaps := agg.Snapshot(keys)
+		sentCount := 0
 
 		for _, sn := range snaps {
 			select {
@@ -296,11 +298,20 @@ func RunKeyFlusherWithMetrics(
 				m.MarkFirstSend()
 				atomic.AddInt64(&m.ItemsSent, 1)
 			}
+			sentCount++
 
 			delete(pending, sn.k)
 			if agg.AckSent(sn.k, sn.rev) {
 				pending[sn.k] = struct{}{}
 			}
+		}
+		if sentCount > 0 {
+			batchIdx++
+			logBenchmarkEvent(ctx, "stream_flush", map[string]any{
+				"batch_idx":   batchIdx,
+				"batch_size":  sentCount,
+				"force_flush": force,
+			})
 		}
 		return nil
 	}

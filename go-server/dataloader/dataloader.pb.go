@@ -76,6 +76,58 @@ func (BucketStrategy) EnumDescriptor() ([]byte, []int) {
 	return file_dataloader_proto_rawDescGZIP(), []int{0}
 }
 
+type HybridStrategy int32
+
+const (
+	HybridStrategy_AUTO        HybridStrategy = 0
+	HybridStrategy_POST_FILTER HybridStrategy = 1
+	HybridStrategy_PRE_FILTER  HybridStrategy = 2
+	HybridStrategy_HYBRID      HybridStrategy = 3
+)
+
+// Enum value maps for HybridStrategy.
+var (
+	HybridStrategy_name = map[int32]string{
+		0: "AUTO",
+		1: "POST_FILTER",
+		2: "PRE_FILTER",
+		3: "HYBRID",
+	}
+	HybridStrategy_value = map[string]int32{
+		"AUTO":        0,
+		"POST_FILTER": 1,
+		"PRE_FILTER":  2,
+		"HYBRID":      3,
+	}
+)
+
+func (x HybridStrategy) Enum() *HybridStrategy {
+	p := new(HybridStrategy)
+	*p = x
+	return p
+}
+
+func (x HybridStrategy) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (HybridStrategy) Descriptor() protoreflect.EnumDescriptor {
+	return file_dataloader_proto_enumTypes[1].Descriptor()
+}
+
+func (HybridStrategy) Type() protoreflect.EnumType {
+	return &file_dataloader_proto_enumTypes[1]
+}
+
+func (x HybridStrategy) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use HybridStrategy.Descriptor instead.
+func (HybridStrategy) EnumDescriptor() ([]byte, []int) {
+	return file_dataloader_proto_rawDescGZIP(), []int{1}
+}
+
 type FilterValueType int32
 
 const (
@@ -130,11 +182,11 @@ func (x FilterValueType) String() string {
 }
 
 func (FilterValueType) Descriptor() protoreflect.EnumDescriptor {
-	return file_dataloader_proto_enumTypes[1].Descriptor()
+	return file_dataloader_proto_enumTypes[2].Descriptor()
 }
 
 func (FilterValueType) Type() protoreflect.EnumType {
-	return &file_dataloader_proto_enumTypes[1]
+	return &file_dataloader_proto_enumTypes[2]
 }
 
 func (x FilterValueType) Number() protoreflect.EnumNumber {
@@ -143,7 +195,7 @@ func (x FilterValueType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use FilterValueType.Descriptor instead.
 func (FilterValueType) EnumDescriptor() ([]byte, []int) {
-	return file_dataloader_proto_rawDescGZIP(), []int{1}
+	return file_dataloader_proto_rawDescGZIP(), []int{2}
 }
 
 type AxisType int32
@@ -182,11 +234,11 @@ func (x AxisType) String() string {
 }
 
 func (AxisType) Descriptor() protoreflect.EnumDescriptor {
-	return file_dataloader_proto_enumTypes[2].Descriptor()
+	return file_dataloader_proto_enumTypes[3].Descriptor()
 }
 
 func (AxisType) Type() protoreflect.EnumType {
-	return &file_dataloader_proto_enumTypes[2]
+	return &file_dataloader_proto_enumTypes[3]
 }
 
 func (x AxisType) Number() protoreflect.EnumNumber {
@@ -195,7 +247,7 @@ func (x AxisType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AxisType.Descriptor instead.
 func (AxisType) EnumDescriptor() ([]byte, []int) {
-	return file_dataloader_proto_rawDescGZIP(), []int{2}
+	return file_dataloader_proto_rawDescGZIP(), []int{3}
 }
 
 // General use
@@ -3671,6 +3723,7 @@ type GetBrowsingStateRequest struct {
 	VectorDimension *VectorSearchDimension `protobuf:"bytes,5,opt,name=vector_dimension,json=vectorDimension,proto3" json:"vector_dimension,omitempty"`
 	VectorBucketId  *int32                 `protobuf:"varint,6,opt,name=vector_bucket_id,json=vectorBucketId,proto3,oneof" json:"vector_bucket_id,omitempty"`
 	RebucketOnly    bool                   `protobuf:"varint,7,opt,name=rebucket_only,json=rebucketOnly,proto3" json:"rebucket_only,omitempty"`
+	HybridStrategy  HybridStrategy         `protobuf:"varint,8,opt,name=hybrid_strategy,json=hybridStrategy,proto3,enum=dataloader.HybridStrategy" json:"hybrid_strategy,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -3752,6 +3805,13 @@ func (x *GetBrowsingStateRequest) GetRebucketOnly() bool {
 		return x.RebucketOnly
 	}
 	return false
+}
+
+func (x *GetBrowsingStateRequest) GetHybridStrategy() HybridStrategy {
+	if x != nil {
+		return x.HybridStrategy
+	}
+	return HybridStrategy_AUTO
 }
 
 type AxisFilter struct {
@@ -4238,7 +4298,7 @@ const file_dataloader_proto_rawDesc = "" +
 	"lowerBound\x12\x1f\n" +
 	"\vupper_bound\x18\x03 \x01(\x02R\n" +
 	"upperBound\x12\x14\n" +
-	"\x05label\x18\x04 \x01(\tR\x05label\"\xf5\x02\n" +
+	"\x05label\x18\x04 \x01(\tR\x05label\"\xba\x03\n" +
 	"\x17GetBrowsingStateRequest\x120\n" +
 	"\afilters\x18\x01 \x03(\v2\x16.dataloader.AxisFilterR\afilters\x12\x10\n" +
 	"\x03all\x18\x02 \x01(\tR\x03all\x12\x1a\n" +
@@ -4246,7 +4306,8 @@ const file_dataloader_proto_rawDesc = "" +
 	"\rvector_filter\x18\x04 \x01(\v2\x1e.dataloader.VectorFilterConfigR\fvectorFilter\x12L\n" +
 	"\x10vector_dimension\x18\x05 \x01(\v2!.dataloader.VectorSearchDimensionR\x0fvectorDimension\x12-\n" +
 	"\x10vector_bucket_id\x18\x06 \x01(\x05H\x00R\x0evectorBucketId\x88\x01\x01\x12#\n" +
-	"\rrebucket_only\x18\a \x01(\bR\frebucketOnlyB\x13\n" +
+	"\rrebucket_only\x18\a \x01(\bR\frebucketOnly\x12C\n" +
+	"\x0fhybrid_strategy\x18\b \x01(\x0e2\x1a.dataloader.HybridStrategyR\x0ehybridStrategyB\x13\n" +
 	"\x11_vector_bucket_id\"\x9b\x01\n" +
 	"\n" +
 	"AxisFilter\x12<\n" +
@@ -4273,7 +4334,14 @@ const file_dataloader_proto_rawDesc = "" +
 	"\vEQUAL_DEPTH\x10\x01\x12\x0f\n" +
 	"\vLOGARITHMIC\x10\x02\x12\n" +
 	"\n" +
-	"\x06CUSTOM\x10\x03*\xa2\x01\n" +
+	"\x06CUSTOM\x10\x03*G\n" +
+	"\x0eHybridStrategy\x12\b\n" +
+	"\x04AUTO\x10\x00\x12\x0f\n" +
+	"\vPOST_FILTER\x10\x01\x12\x0e\n" +
+	"\n" +
+	"PRE_FILTER\x10\x02\x12\n" +
+	"\n" +
+	"\x06HYBRID\x10\x03*\xa2\x01\n" +
 	"\x0fFilterValueType\x12\r\n" +
 	"\tUNDEFINED\x10\x00\x12\a\n" +
 	"\x03TAG\x10\x01\x12\n" +
@@ -4355,218 +4423,220 @@ func file_dataloader_proto_rawDescGZIP() []byte {
 	return file_dataloader_proto_rawDescData
 }
 
-var file_dataloader_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_dataloader_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
 var file_dataloader_proto_msgTypes = make([]protoimpl.MessageInfo, 55)
 var file_dataloader_proto_goTypes = []any{
 	(BucketStrategy)(0),                 // 0: dataloader.BucketStrategy
-	(FilterValueType)(0),                // 1: dataloader.FilterValueType
-	(AxisType)(0),                       // 2: dataloader.AxisType
-	(*Empty)(nil),                       // 3: dataloader.Empty
-	(*IdRequest)(nil),                   // 4: dataloader.IdRequest
-	(*IdResponse)(nil),                  // 5: dataloader.IdResponse
-	(*RepeatedIdResponse)(nil),          // 6: dataloader.RepeatedIdResponse
-	(*Media)(nil),                       // 7: dataloader.Media
-	(*GetMediasRequest)(nil),            // 8: dataloader.GetMediasRequest
-	(*GetMediaByURIRequest)(nil),        // 9: dataloader.GetMediaByURIRequest
-	(*StreamingMediaResponse)(nil),      // 10: dataloader.StreamingMediaResponse
-	(*CreateMediaStreamResponse)(nil),   // 11: dataloader.CreateMediaStreamResponse
-	(*TagSet)(nil),                      // 12: dataloader.TagSet
-	(*GetTagSetsRequest)(nil),           // 13: dataloader.GetTagSetsRequest
-	(*GetTagSetRequestByName)(nil),      // 14: dataloader.GetTagSetRequestByName
-	(*CreateTagSetRequest)(nil),         // 15: dataloader.CreateTagSetRequest
-	(*StreamingTagSetResponse)(nil),     // 16: dataloader.StreamingTagSetResponse
-	(*TagSetsResponse)(nil),             // 17: dataloader.TagSetsResponse
-	(*Tag)(nil),                         // 18: dataloader.Tag
-	(*TagInTagset)(nil),                 // 19: dataloader.TagInTagset
-	(*AlphanumericalValue)(nil),         // 20: dataloader.AlphanumericalValue
-	(*NumericalValue)(nil),              // 21: dataloader.NumericalValue
-	(*DateValue)(nil),                   // 22: dataloader.DateValue
-	(*TimeValue)(nil),                   // 23: dataloader.TimeValue
-	(*TimeStampValue)(nil),              // 24: dataloader.TimeStampValue
-	(*GetTagsRequest)(nil),              // 25: dataloader.GetTagsRequest
-	(*CreateTagRequest)(nil),            // 26: dataloader.CreateTagRequest
-	(*StreamingTagResponse)(nil),        // 27: dataloader.StreamingTagResponse
-	(*CreateTagStreamRequest)(nil),      // 28: dataloader.CreateTagStreamRequest
-	(*CreateTagStreamResponse)(nil),     // 29: dataloader.CreateTagStreamResponse
-	(*ChangeTagNameRequest)(nil),        // 30: dataloader.ChangeTagNameRequest
-	(*Tagging)(nil),                     // 31: dataloader.Tagging
-	(*CreateTaggingRequest)(nil),        // 32: dataloader.CreateTaggingRequest
-	(*StreamingTaggingResponse)(nil),    // 33: dataloader.StreamingTaggingResponse
-	(*CreateTaggingStreamResponse)(nil), // 34: dataloader.CreateTaggingStreamResponse
-	(*ChangeTaggingRequest)(nil),        // 35: dataloader.ChangeTaggingRequest
-	(*Hierarchy)(nil),                   // 36: dataloader.Hierarchy
-	(*GetHierarchiesRequest)(nil),       // 37: dataloader.GetHierarchiesRequest
-	(*CreateHierarchyRequest)(nil),      // 38: dataloader.CreateHierarchyRequest
-	(*StreamingHierarchyResponse)(nil),  // 39: dataloader.StreamingHierarchyResponse
-	(*Node)(nil),                        // 40: dataloader.Node
-	(*CreateNodeRequest)(nil),           // 41: dataloader.CreateNodeRequest
-	(*GetNodesRequest)(nil),             // 42: dataloader.GetNodesRequest
-	(*StreamingNodeResponse)(nil),       // 43: dataloader.StreamingNodeResponse
-	(*ChildNodeResponse)(nil),           // 44: dataloader.ChildNodeResponse
-	(*GetCellRequest)(nil),              // 45: dataloader.GetCellRequest
-	(*Vector)(nil),                      // 46: dataloader.Vector
-	(*VectorReference)(nil),             // 47: dataloader.VectorReference
-	(*VectorFilterConfig)(nil),          // 48: dataloader.VectorFilterConfig
-	(*BucketConfig)(nil),                // 49: dataloader.BucketConfig
-	(*VectorSearchDimension)(nil),       // 50: dataloader.VectorSearchDimension
-	(*BucketInfo)(nil),                  // 51: dataloader.BucketInfo
-	(*GetBrowsingStateRequest)(nil),     // 52: dataloader.GetBrowsingStateRequest
-	(*AxisFilter)(nil),                  // 53: dataloader.AxisFilter
-	(*BrowsingStateResponse)(nil),       // 54: dataloader.BrowsingStateResponse
-	(*BrowsingStateChunk)(nil),          // 55: dataloader.BrowsingStateChunk
-	(*CubeObject)(nil),                  // 56: dataloader.CubeObject
-	nil,                                 // 57: dataloader.CreateTagStreamResponse.IdMapEntry
-	(*status.Status)(nil),               // 58: google.rpc.Status
-	(*wrapperspb.Int64Value)(nil),       // 59: google.protobuf.Int64Value
+	(HybridStrategy)(0),                 // 1: dataloader.HybridStrategy
+	(FilterValueType)(0),                // 2: dataloader.FilterValueType
+	(AxisType)(0),                       // 3: dataloader.AxisType
+	(*Empty)(nil),                       // 4: dataloader.Empty
+	(*IdRequest)(nil),                   // 5: dataloader.IdRequest
+	(*IdResponse)(nil),                  // 6: dataloader.IdResponse
+	(*RepeatedIdResponse)(nil),          // 7: dataloader.RepeatedIdResponse
+	(*Media)(nil),                       // 8: dataloader.Media
+	(*GetMediasRequest)(nil),            // 9: dataloader.GetMediasRequest
+	(*GetMediaByURIRequest)(nil),        // 10: dataloader.GetMediaByURIRequest
+	(*StreamingMediaResponse)(nil),      // 11: dataloader.StreamingMediaResponse
+	(*CreateMediaStreamResponse)(nil),   // 12: dataloader.CreateMediaStreamResponse
+	(*TagSet)(nil),                      // 13: dataloader.TagSet
+	(*GetTagSetsRequest)(nil),           // 14: dataloader.GetTagSetsRequest
+	(*GetTagSetRequestByName)(nil),      // 15: dataloader.GetTagSetRequestByName
+	(*CreateTagSetRequest)(nil),         // 16: dataloader.CreateTagSetRequest
+	(*StreamingTagSetResponse)(nil),     // 17: dataloader.StreamingTagSetResponse
+	(*TagSetsResponse)(nil),             // 18: dataloader.TagSetsResponse
+	(*Tag)(nil),                         // 19: dataloader.Tag
+	(*TagInTagset)(nil),                 // 20: dataloader.TagInTagset
+	(*AlphanumericalValue)(nil),         // 21: dataloader.AlphanumericalValue
+	(*NumericalValue)(nil),              // 22: dataloader.NumericalValue
+	(*DateValue)(nil),                   // 23: dataloader.DateValue
+	(*TimeValue)(nil),                   // 24: dataloader.TimeValue
+	(*TimeStampValue)(nil),              // 25: dataloader.TimeStampValue
+	(*GetTagsRequest)(nil),              // 26: dataloader.GetTagsRequest
+	(*CreateTagRequest)(nil),            // 27: dataloader.CreateTagRequest
+	(*StreamingTagResponse)(nil),        // 28: dataloader.StreamingTagResponse
+	(*CreateTagStreamRequest)(nil),      // 29: dataloader.CreateTagStreamRequest
+	(*CreateTagStreamResponse)(nil),     // 30: dataloader.CreateTagStreamResponse
+	(*ChangeTagNameRequest)(nil),        // 31: dataloader.ChangeTagNameRequest
+	(*Tagging)(nil),                     // 32: dataloader.Tagging
+	(*CreateTaggingRequest)(nil),        // 33: dataloader.CreateTaggingRequest
+	(*StreamingTaggingResponse)(nil),    // 34: dataloader.StreamingTaggingResponse
+	(*CreateTaggingStreamResponse)(nil), // 35: dataloader.CreateTaggingStreamResponse
+	(*ChangeTaggingRequest)(nil),        // 36: dataloader.ChangeTaggingRequest
+	(*Hierarchy)(nil),                   // 37: dataloader.Hierarchy
+	(*GetHierarchiesRequest)(nil),       // 38: dataloader.GetHierarchiesRequest
+	(*CreateHierarchyRequest)(nil),      // 39: dataloader.CreateHierarchyRequest
+	(*StreamingHierarchyResponse)(nil),  // 40: dataloader.StreamingHierarchyResponse
+	(*Node)(nil),                        // 41: dataloader.Node
+	(*CreateNodeRequest)(nil),           // 42: dataloader.CreateNodeRequest
+	(*GetNodesRequest)(nil),             // 43: dataloader.GetNodesRequest
+	(*StreamingNodeResponse)(nil),       // 44: dataloader.StreamingNodeResponse
+	(*ChildNodeResponse)(nil),           // 45: dataloader.ChildNodeResponse
+	(*GetCellRequest)(nil),              // 46: dataloader.GetCellRequest
+	(*Vector)(nil),                      // 47: dataloader.Vector
+	(*VectorReference)(nil),             // 48: dataloader.VectorReference
+	(*VectorFilterConfig)(nil),          // 49: dataloader.VectorFilterConfig
+	(*BucketConfig)(nil),                // 50: dataloader.BucketConfig
+	(*VectorSearchDimension)(nil),       // 51: dataloader.VectorSearchDimension
+	(*BucketInfo)(nil),                  // 52: dataloader.BucketInfo
+	(*GetBrowsingStateRequest)(nil),     // 53: dataloader.GetBrowsingStateRequest
+	(*AxisFilter)(nil),                  // 54: dataloader.AxisFilter
+	(*BrowsingStateResponse)(nil),       // 55: dataloader.BrowsingStateResponse
+	(*BrowsingStateChunk)(nil),          // 56: dataloader.BrowsingStateChunk
+	(*CubeObject)(nil),                  // 57: dataloader.CubeObject
+	nil,                                 // 58: dataloader.CreateTagStreamResponse.IdMapEntry
+	(*status.Status)(nil),               // 59: google.rpc.Status
+	(*wrapperspb.Int64Value)(nil),       // 60: google.protobuf.Int64Value
 }
 var file_dataloader_proto_depIdxs = []int32{
-	7,   // 0: dataloader.StreamingMediaResponse.media:type_name -> dataloader.Media
-	58,  // 1: dataloader.StreamingMediaResponse.error:type_name -> google.rpc.Status
-	58,  // 2: dataloader.CreateMediaStreamResponse.error:type_name -> google.rpc.Status
-	12,  // 3: dataloader.StreamingTagSetResponse.tagset:type_name -> dataloader.TagSet
-	58,  // 4: dataloader.StreamingTagSetResponse.error:type_name -> google.rpc.Status
-	19,  // 5: dataloader.TagSetsResponse.tags:type_name -> dataloader.TagInTagset
-	36,  // 6: dataloader.TagSetsResponse.hierarchies:type_name -> dataloader.Hierarchy
-	20,  // 7: dataloader.Tag.alphanumerical:type_name -> dataloader.AlphanumericalValue
-	24,  // 8: dataloader.Tag.timestamp:type_name -> dataloader.TimeStampValue
-	23,  // 9: dataloader.Tag.time:type_name -> dataloader.TimeValue
-	22,  // 10: dataloader.Tag.date:type_name -> dataloader.DateValue
-	21,  // 11: dataloader.Tag.numerical:type_name -> dataloader.NumericalValue
-	59,  // 12: dataloader.TagInTagset.tagType:type_name -> google.protobuf.Int64Value
-	59,  // 13: dataloader.TagInTagset.ObjectTagRelations:type_name -> google.protobuf.Int64Value
-	20,  // 14: dataloader.CreateTagRequest.alphanumerical:type_name -> dataloader.AlphanumericalValue
-	24,  // 15: dataloader.CreateTagRequest.timestamp:type_name -> dataloader.TimeStampValue
-	23,  // 16: dataloader.CreateTagRequest.time:type_name -> dataloader.TimeValue
-	22,  // 17: dataloader.CreateTagRequest.date:type_name -> dataloader.DateValue
-	21,  // 18: dataloader.CreateTagRequest.numerical:type_name -> dataloader.NumericalValue
-	18,  // 19: dataloader.StreamingTagResponse.tag:type_name -> dataloader.Tag
-	58,  // 20: dataloader.StreamingTagResponse.error:type_name -> google.rpc.Status
-	20,  // 21: dataloader.CreateTagStreamRequest.alphanumerical:type_name -> dataloader.AlphanumericalValue
-	24,  // 22: dataloader.CreateTagStreamRequest.timestamp:type_name -> dataloader.TimeStampValue
-	23,  // 23: dataloader.CreateTagStreamRequest.time:type_name -> dataloader.TimeValue
-	22,  // 24: dataloader.CreateTagStreamRequest.date:type_name -> dataloader.DateValue
-	21,  // 25: dataloader.CreateTagStreamRequest.numerical:type_name -> dataloader.NumericalValue
-	57,  // 26: dataloader.CreateTagStreamResponse.id_map:type_name -> dataloader.CreateTagStreamResponse.IdMapEntry
-	20,  // 27: dataloader.ChangeTagNameRequest.newAlphanumerical:type_name -> dataloader.AlphanumericalValue
-	24,  // 28: dataloader.ChangeTagNameRequest.newTimestamp:type_name -> dataloader.TimeStampValue
-	23,  // 29: dataloader.ChangeTagNameRequest.newTime:type_name -> dataloader.TimeValue
-	22,  // 30: dataloader.ChangeTagNameRequest.newDate:type_name -> dataloader.DateValue
-	21,  // 31: dataloader.ChangeTagNameRequest.newNumerical:type_name -> dataloader.NumericalValue
-	31,  // 32: dataloader.StreamingTaggingResponse.tagging:type_name -> dataloader.Tagging
-	58,  // 33: dataloader.StreamingTaggingResponse.error:type_name -> google.rpc.Status
-	58,  // 34: dataloader.CreateTaggingStreamResponse.error:type_name -> google.rpc.Status
-	20,  // 35: dataloader.ChangeTaggingRequest.alphanumerical:type_name -> dataloader.AlphanumericalValue
-	24,  // 36: dataloader.ChangeTaggingRequest.timestamp:type_name -> dataloader.TimeStampValue
-	23,  // 37: dataloader.ChangeTaggingRequest.time:type_name -> dataloader.TimeValue
-	22,  // 38: dataloader.ChangeTaggingRequest.date:type_name -> dataloader.DateValue
-	21,  // 39: dataloader.ChangeTaggingRequest.numerical:type_name -> dataloader.NumericalValue
-	59,  // 40: dataloader.Hierarchy.nodes:type_name -> google.protobuf.Int64Value
-	36,  // 41: dataloader.StreamingHierarchyResponse.hierarchy:type_name -> dataloader.Hierarchy
-	58,  // 42: dataloader.StreamingHierarchyResponse.error:type_name -> google.rpc.Status
-	40,  // 43: dataloader.StreamingNodeResponse.node:type_name -> dataloader.Node
-	58,  // 44: dataloader.StreamingNodeResponse.error:type_name -> google.rpc.Status
-	44,  // 45: dataloader.ChildNodeResponse.parentNode:type_name -> dataloader.ChildNodeResponse
-	46,  // 46: dataloader.VectorReference.raw_embedding:type_name -> dataloader.Vector
-	47,  // 47: dataloader.VectorFilterConfig.reference:type_name -> dataloader.VectorReference
+	8,   // 0: dataloader.StreamingMediaResponse.media:type_name -> dataloader.Media
+	59,  // 1: dataloader.StreamingMediaResponse.error:type_name -> google.rpc.Status
+	59,  // 2: dataloader.CreateMediaStreamResponse.error:type_name -> google.rpc.Status
+	13,  // 3: dataloader.StreamingTagSetResponse.tagset:type_name -> dataloader.TagSet
+	59,  // 4: dataloader.StreamingTagSetResponse.error:type_name -> google.rpc.Status
+	20,  // 5: dataloader.TagSetsResponse.tags:type_name -> dataloader.TagInTagset
+	37,  // 6: dataloader.TagSetsResponse.hierarchies:type_name -> dataloader.Hierarchy
+	21,  // 7: dataloader.Tag.alphanumerical:type_name -> dataloader.AlphanumericalValue
+	25,  // 8: dataloader.Tag.timestamp:type_name -> dataloader.TimeStampValue
+	24,  // 9: dataloader.Tag.time:type_name -> dataloader.TimeValue
+	23,  // 10: dataloader.Tag.date:type_name -> dataloader.DateValue
+	22,  // 11: dataloader.Tag.numerical:type_name -> dataloader.NumericalValue
+	60,  // 12: dataloader.TagInTagset.tagType:type_name -> google.protobuf.Int64Value
+	60,  // 13: dataloader.TagInTagset.ObjectTagRelations:type_name -> google.protobuf.Int64Value
+	21,  // 14: dataloader.CreateTagRequest.alphanumerical:type_name -> dataloader.AlphanumericalValue
+	25,  // 15: dataloader.CreateTagRequest.timestamp:type_name -> dataloader.TimeStampValue
+	24,  // 16: dataloader.CreateTagRequest.time:type_name -> dataloader.TimeValue
+	23,  // 17: dataloader.CreateTagRequest.date:type_name -> dataloader.DateValue
+	22,  // 18: dataloader.CreateTagRequest.numerical:type_name -> dataloader.NumericalValue
+	19,  // 19: dataloader.StreamingTagResponse.tag:type_name -> dataloader.Tag
+	59,  // 20: dataloader.StreamingTagResponse.error:type_name -> google.rpc.Status
+	21,  // 21: dataloader.CreateTagStreamRequest.alphanumerical:type_name -> dataloader.AlphanumericalValue
+	25,  // 22: dataloader.CreateTagStreamRequest.timestamp:type_name -> dataloader.TimeStampValue
+	24,  // 23: dataloader.CreateTagStreamRequest.time:type_name -> dataloader.TimeValue
+	23,  // 24: dataloader.CreateTagStreamRequest.date:type_name -> dataloader.DateValue
+	22,  // 25: dataloader.CreateTagStreamRequest.numerical:type_name -> dataloader.NumericalValue
+	58,  // 26: dataloader.CreateTagStreamResponse.id_map:type_name -> dataloader.CreateTagStreamResponse.IdMapEntry
+	21,  // 27: dataloader.ChangeTagNameRequest.newAlphanumerical:type_name -> dataloader.AlphanumericalValue
+	25,  // 28: dataloader.ChangeTagNameRequest.newTimestamp:type_name -> dataloader.TimeStampValue
+	24,  // 29: dataloader.ChangeTagNameRequest.newTime:type_name -> dataloader.TimeValue
+	23,  // 30: dataloader.ChangeTagNameRequest.newDate:type_name -> dataloader.DateValue
+	22,  // 31: dataloader.ChangeTagNameRequest.newNumerical:type_name -> dataloader.NumericalValue
+	32,  // 32: dataloader.StreamingTaggingResponse.tagging:type_name -> dataloader.Tagging
+	59,  // 33: dataloader.StreamingTaggingResponse.error:type_name -> google.rpc.Status
+	59,  // 34: dataloader.CreateTaggingStreamResponse.error:type_name -> google.rpc.Status
+	21,  // 35: dataloader.ChangeTaggingRequest.alphanumerical:type_name -> dataloader.AlphanumericalValue
+	25,  // 36: dataloader.ChangeTaggingRequest.timestamp:type_name -> dataloader.TimeStampValue
+	24,  // 37: dataloader.ChangeTaggingRequest.time:type_name -> dataloader.TimeValue
+	23,  // 38: dataloader.ChangeTaggingRequest.date:type_name -> dataloader.DateValue
+	22,  // 39: dataloader.ChangeTaggingRequest.numerical:type_name -> dataloader.NumericalValue
+	60,  // 40: dataloader.Hierarchy.nodes:type_name -> google.protobuf.Int64Value
+	37,  // 41: dataloader.StreamingHierarchyResponse.hierarchy:type_name -> dataloader.Hierarchy
+	59,  // 42: dataloader.StreamingHierarchyResponse.error:type_name -> google.rpc.Status
+	41,  // 43: dataloader.StreamingNodeResponse.node:type_name -> dataloader.Node
+	59,  // 44: dataloader.StreamingNodeResponse.error:type_name -> google.rpc.Status
+	45,  // 45: dataloader.ChildNodeResponse.parentNode:type_name -> dataloader.ChildNodeResponse
+	47,  // 46: dataloader.VectorReference.raw_embedding:type_name -> dataloader.Vector
+	48,  // 47: dataloader.VectorFilterConfig.reference:type_name -> dataloader.VectorReference
 	0,   // 48: dataloader.BucketConfig.strategy:type_name -> dataloader.BucketStrategy
-	47,  // 49: dataloader.VectorSearchDimension.reference:type_name -> dataloader.VectorReference
-	49,  // 50: dataloader.VectorSearchDimension.bucket_cfg:type_name -> dataloader.BucketConfig
-	2,   // 51: dataloader.VectorSearchDimension.axis:type_name -> dataloader.AxisType
-	53,  // 52: dataloader.GetBrowsingStateRequest.filters:type_name -> dataloader.AxisFilter
-	48,  // 53: dataloader.GetBrowsingStateRequest.vector_filter:type_name -> dataloader.VectorFilterConfig
-	50,  // 54: dataloader.GetBrowsingStateRequest.vector_dimension:type_name -> dataloader.VectorSearchDimension
-	2,   // 55: dataloader.AxisFilter.axisFilterType:type_name -> dataloader.AxisType
-	1,   // 56: dataloader.AxisFilter.valueType:type_name -> dataloader.FilterValueType
-	56,  // 57: dataloader.BrowsingStateResponse.cubeObjects:type_name -> dataloader.CubeObject
-	51,  // 58: dataloader.BrowsingStateResponse.bucket_infos:type_name -> dataloader.BucketInfo
-	54,  // 59: dataloader.BrowsingStateChunk.cells:type_name -> dataloader.BrowsingStateResponse
-	8,   // 60: dataloader.DataLoader.getMedias:input_type -> dataloader.GetMediasRequest
-	4,   // 61: dataloader.DataLoader.getMediaById:input_type -> dataloader.IdRequest
-	9,   // 62: dataloader.DataLoader.getMediaByURI:input_type -> dataloader.GetMediaByURIRequest
-	7,   // 63: dataloader.DataLoader.createMedia:input_type -> dataloader.Media
-	7,   // 64: dataloader.DataLoader.createMediaStream:input_type -> dataloader.Media
-	4,   // 65: dataloader.DataLoader.deleteMedia:input_type -> dataloader.IdRequest
-	13,  // 66: dataloader.DataLoader.getTagSets:input_type -> dataloader.GetTagSetsRequest
-	4,   // 67: dataloader.DataLoader.getTagSetById:input_type -> dataloader.IdRequest
-	4,   // 68: dataloader.DataLoader.getTagSetsById:input_type -> dataloader.IdRequest
-	14,  // 69: dataloader.DataLoader.getTagSetByName:input_type -> dataloader.GetTagSetRequestByName
-	15,  // 70: dataloader.DataLoader.createTagSet:input_type -> dataloader.CreateTagSetRequest
-	25,  // 71: dataloader.DataLoader.getTags:input_type -> dataloader.GetTagsRequest
-	4,   // 72: dataloader.DataLoader.getTag:input_type -> dataloader.IdRequest
-	26,  // 73: dataloader.DataLoader.createTag:input_type -> dataloader.CreateTagRequest
-	28,  // 74: dataloader.DataLoader.createTagStream:input_type -> dataloader.CreateTagStreamRequest
-	30,  // 75: dataloader.DataLoader.changeTagName:input_type -> dataloader.ChangeTagNameRequest
-	3,   // 76: dataloader.DataLoader.getTaggings:input_type -> dataloader.Empty
-	4,   // 77: dataloader.DataLoader.getMediasWithTag:input_type -> dataloader.IdRequest
-	4,   // 78: dataloader.DataLoader.getMediaTags:input_type -> dataloader.IdRequest
-	32,  // 79: dataloader.DataLoader.createTagging:input_type -> dataloader.CreateTaggingRequest
-	32,  // 80: dataloader.DataLoader.createTaggingStream:input_type -> dataloader.CreateTaggingRequest
-	35,  // 81: dataloader.DataLoader.changeTagging:input_type -> dataloader.ChangeTaggingRequest
-	37,  // 82: dataloader.DataLoader.getHierarchies:input_type -> dataloader.GetHierarchiesRequest
-	4,   // 83: dataloader.DataLoader.getHierarchy:input_type -> dataloader.IdRequest
-	38,  // 84: dataloader.DataLoader.createHierarchy:input_type -> dataloader.CreateHierarchyRequest
-	42,  // 85: dataloader.DataLoader.getNodes:input_type -> dataloader.GetNodesRequest
-	4,   // 86: dataloader.DataLoader.getNode:input_type -> dataloader.IdRequest
-	4,   // 87: dataloader.DataLoader.getChildNodes:input_type -> dataloader.IdRequest
-	41,  // 88: dataloader.DataLoader.createNode:input_type -> dataloader.CreateNodeRequest
-	41,  // 89: dataloader.DataLoader.createNodeStream:input_type -> dataloader.CreateNodeRequest
-	4,   // 90: dataloader.DataLoader.deleteNode:input_type -> dataloader.IdRequest
-	45,  // 91: dataloader.DataLoader.getCell:input_type -> dataloader.GetCellRequest
-	52,  // 92: dataloader.DataLoader.getBrowsingState:input_type -> dataloader.GetBrowsingStateRequest
-	52,  // 93: dataloader.DataLoader.getBrowsingState2:input_type -> dataloader.GetBrowsingStateRequest
-	52,  // 94: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesIncrementalGrouping:input_type -> dataloader.GetBrowsingStateRequest
-	52,  // 95: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesSingles:input_type -> dataloader.GetBrowsingStateRequest
-	52,  // 96: dataloader.DataLoader.getBrowsingStateDistinctBranchesFull:input_type -> dataloader.GetBrowsingStateRequest
-	52,  // 97: dataloader.DataLoader.getBrowsingStateDistinctBranchesIncrementalGrouping:input_type -> dataloader.GetBrowsingStateRequest
-	52,  // 98: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesDeduplicatedSingles:input_type -> dataloader.GetBrowsingStateRequest
-	52,  // 99: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesFull:input_type -> dataloader.GetBrowsingStateRequest
-	3,   // 100: dataloader.DataLoader.resetDatabase:input_type -> dataloader.Empty
-	10,  // 101: dataloader.DataLoader.getMedias:output_type -> dataloader.StreamingMediaResponse
-	7,   // 102: dataloader.DataLoader.getMediaById:output_type -> dataloader.Media
-	7,   // 103: dataloader.DataLoader.getMediaByURI:output_type -> dataloader.Media
-	7,   // 104: dataloader.DataLoader.createMedia:output_type -> dataloader.Media
-	11,  // 105: dataloader.DataLoader.createMediaStream:output_type -> dataloader.CreateMediaStreamResponse
-	3,   // 106: dataloader.DataLoader.deleteMedia:output_type -> dataloader.Empty
-	16,  // 107: dataloader.DataLoader.getTagSets:output_type -> dataloader.StreamingTagSetResponse
-	12,  // 108: dataloader.DataLoader.getTagSetById:output_type -> dataloader.TagSet
-	17,  // 109: dataloader.DataLoader.getTagSetsById:output_type -> dataloader.TagSetsResponse
-	12,  // 110: dataloader.DataLoader.getTagSetByName:output_type -> dataloader.TagSet
-	12,  // 111: dataloader.DataLoader.createTagSet:output_type -> dataloader.TagSet
-	27,  // 112: dataloader.DataLoader.getTags:output_type -> dataloader.StreamingTagResponse
-	18,  // 113: dataloader.DataLoader.getTag:output_type -> dataloader.Tag
-	18,  // 114: dataloader.DataLoader.createTag:output_type -> dataloader.Tag
-	29,  // 115: dataloader.DataLoader.createTagStream:output_type -> dataloader.CreateTagStreamResponse
-	3,   // 116: dataloader.DataLoader.changeTagName:output_type -> dataloader.Empty
-	33,  // 117: dataloader.DataLoader.getTaggings:output_type -> dataloader.StreamingTaggingResponse
-	6,   // 118: dataloader.DataLoader.getMediasWithTag:output_type -> dataloader.RepeatedIdResponse
-	6,   // 119: dataloader.DataLoader.getMediaTags:output_type -> dataloader.RepeatedIdResponse
-	31,  // 120: dataloader.DataLoader.createTagging:output_type -> dataloader.Tagging
-	34,  // 121: dataloader.DataLoader.createTaggingStream:output_type -> dataloader.CreateTaggingStreamResponse
-	3,   // 122: dataloader.DataLoader.changeTagging:output_type -> dataloader.Empty
-	39,  // 123: dataloader.DataLoader.getHierarchies:output_type -> dataloader.StreamingHierarchyResponse
-	36,  // 124: dataloader.DataLoader.getHierarchy:output_type -> dataloader.Hierarchy
-	36,  // 125: dataloader.DataLoader.createHierarchy:output_type -> dataloader.Hierarchy
-	43,  // 126: dataloader.DataLoader.getNodes:output_type -> dataloader.StreamingNodeResponse
-	40,  // 127: dataloader.DataLoader.getNode:output_type -> dataloader.Node
-	44,  // 128: dataloader.DataLoader.getChildNodes:output_type -> dataloader.ChildNodeResponse
-	40,  // 129: dataloader.DataLoader.createNode:output_type -> dataloader.Node
-	43,  // 130: dataloader.DataLoader.createNodeStream:output_type -> dataloader.StreamingNodeResponse
-	3,   // 131: dataloader.DataLoader.deleteNode:output_type -> dataloader.Empty
-	54,  // 132: dataloader.DataLoader.getCell:output_type -> dataloader.BrowsingStateResponse
-	54,  // 133: dataloader.DataLoader.getBrowsingState:output_type -> dataloader.BrowsingStateResponse
-	54,  // 134: dataloader.DataLoader.getBrowsingState2:output_type -> dataloader.BrowsingStateResponse
-	54,  // 135: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesIncrementalGrouping:output_type -> dataloader.BrowsingStateResponse
-	54,  // 136: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesSingles:output_type -> dataloader.BrowsingStateResponse
-	54,  // 137: dataloader.DataLoader.getBrowsingStateDistinctBranchesFull:output_type -> dataloader.BrowsingStateResponse
-	54,  // 138: dataloader.DataLoader.getBrowsingStateDistinctBranchesIncrementalGrouping:output_type -> dataloader.BrowsingStateResponse
-	54,  // 139: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesDeduplicatedSingles:output_type -> dataloader.BrowsingStateResponse
-	54,  // 140: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesFull:output_type -> dataloader.BrowsingStateResponse
-	3,   // 141: dataloader.DataLoader.resetDatabase:output_type -> dataloader.Empty
-	101, // [101:142] is the sub-list for method output_type
-	60,  // [60:101] is the sub-list for method input_type
-	60,  // [60:60] is the sub-list for extension type_name
-	60,  // [60:60] is the sub-list for extension extendee
-	0,   // [0:60] is the sub-list for field type_name
+	48,  // 49: dataloader.VectorSearchDimension.reference:type_name -> dataloader.VectorReference
+	50,  // 50: dataloader.VectorSearchDimension.bucket_cfg:type_name -> dataloader.BucketConfig
+	3,   // 51: dataloader.VectorSearchDimension.axis:type_name -> dataloader.AxisType
+	54,  // 52: dataloader.GetBrowsingStateRequest.filters:type_name -> dataloader.AxisFilter
+	49,  // 53: dataloader.GetBrowsingStateRequest.vector_filter:type_name -> dataloader.VectorFilterConfig
+	51,  // 54: dataloader.GetBrowsingStateRequest.vector_dimension:type_name -> dataloader.VectorSearchDimension
+	1,   // 55: dataloader.GetBrowsingStateRequest.hybrid_strategy:type_name -> dataloader.HybridStrategy
+	3,   // 56: dataloader.AxisFilter.axisFilterType:type_name -> dataloader.AxisType
+	2,   // 57: dataloader.AxisFilter.valueType:type_name -> dataloader.FilterValueType
+	57,  // 58: dataloader.BrowsingStateResponse.cubeObjects:type_name -> dataloader.CubeObject
+	52,  // 59: dataloader.BrowsingStateResponse.bucket_infos:type_name -> dataloader.BucketInfo
+	55,  // 60: dataloader.BrowsingStateChunk.cells:type_name -> dataloader.BrowsingStateResponse
+	9,   // 61: dataloader.DataLoader.getMedias:input_type -> dataloader.GetMediasRequest
+	5,   // 62: dataloader.DataLoader.getMediaById:input_type -> dataloader.IdRequest
+	10,  // 63: dataloader.DataLoader.getMediaByURI:input_type -> dataloader.GetMediaByURIRequest
+	8,   // 64: dataloader.DataLoader.createMedia:input_type -> dataloader.Media
+	8,   // 65: dataloader.DataLoader.createMediaStream:input_type -> dataloader.Media
+	5,   // 66: dataloader.DataLoader.deleteMedia:input_type -> dataloader.IdRequest
+	14,  // 67: dataloader.DataLoader.getTagSets:input_type -> dataloader.GetTagSetsRequest
+	5,   // 68: dataloader.DataLoader.getTagSetById:input_type -> dataloader.IdRequest
+	5,   // 69: dataloader.DataLoader.getTagSetsById:input_type -> dataloader.IdRequest
+	15,  // 70: dataloader.DataLoader.getTagSetByName:input_type -> dataloader.GetTagSetRequestByName
+	16,  // 71: dataloader.DataLoader.createTagSet:input_type -> dataloader.CreateTagSetRequest
+	26,  // 72: dataloader.DataLoader.getTags:input_type -> dataloader.GetTagsRequest
+	5,   // 73: dataloader.DataLoader.getTag:input_type -> dataloader.IdRequest
+	27,  // 74: dataloader.DataLoader.createTag:input_type -> dataloader.CreateTagRequest
+	29,  // 75: dataloader.DataLoader.createTagStream:input_type -> dataloader.CreateTagStreamRequest
+	31,  // 76: dataloader.DataLoader.changeTagName:input_type -> dataloader.ChangeTagNameRequest
+	4,   // 77: dataloader.DataLoader.getTaggings:input_type -> dataloader.Empty
+	5,   // 78: dataloader.DataLoader.getMediasWithTag:input_type -> dataloader.IdRequest
+	5,   // 79: dataloader.DataLoader.getMediaTags:input_type -> dataloader.IdRequest
+	33,  // 80: dataloader.DataLoader.createTagging:input_type -> dataloader.CreateTaggingRequest
+	33,  // 81: dataloader.DataLoader.createTaggingStream:input_type -> dataloader.CreateTaggingRequest
+	36,  // 82: dataloader.DataLoader.changeTagging:input_type -> dataloader.ChangeTaggingRequest
+	38,  // 83: dataloader.DataLoader.getHierarchies:input_type -> dataloader.GetHierarchiesRequest
+	5,   // 84: dataloader.DataLoader.getHierarchy:input_type -> dataloader.IdRequest
+	39,  // 85: dataloader.DataLoader.createHierarchy:input_type -> dataloader.CreateHierarchyRequest
+	43,  // 86: dataloader.DataLoader.getNodes:input_type -> dataloader.GetNodesRequest
+	5,   // 87: dataloader.DataLoader.getNode:input_type -> dataloader.IdRequest
+	5,   // 88: dataloader.DataLoader.getChildNodes:input_type -> dataloader.IdRequest
+	42,  // 89: dataloader.DataLoader.createNode:input_type -> dataloader.CreateNodeRequest
+	42,  // 90: dataloader.DataLoader.createNodeStream:input_type -> dataloader.CreateNodeRequest
+	5,   // 91: dataloader.DataLoader.deleteNode:input_type -> dataloader.IdRequest
+	46,  // 92: dataloader.DataLoader.getCell:input_type -> dataloader.GetCellRequest
+	53,  // 93: dataloader.DataLoader.getBrowsingState:input_type -> dataloader.GetBrowsingStateRequest
+	53,  // 94: dataloader.DataLoader.getBrowsingState2:input_type -> dataloader.GetBrowsingStateRequest
+	53,  // 95: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesIncrementalGrouping:input_type -> dataloader.GetBrowsingStateRequest
+	53,  // 96: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesSingles:input_type -> dataloader.GetBrowsingStateRequest
+	53,  // 97: dataloader.DataLoader.getBrowsingStateDistinctBranchesFull:input_type -> dataloader.GetBrowsingStateRequest
+	53,  // 98: dataloader.DataLoader.getBrowsingStateDistinctBranchesIncrementalGrouping:input_type -> dataloader.GetBrowsingStateRequest
+	53,  // 99: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesDeduplicatedSingles:input_type -> dataloader.GetBrowsingStateRequest
+	53,  // 100: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesFull:input_type -> dataloader.GetBrowsingStateRequest
+	4,   // 101: dataloader.DataLoader.resetDatabase:input_type -> dataloader.Empty
+	11,  // 102: dataloader.DataLoader.getMedias:output_type -> dataloader.StreamingMediaResponse
+	8,   // 103: dataloader.DataLoader.getMediaById:output_type -> dataloader.Media
+	8,   // 104: dataloader.DataLoader.getMediaByURI:output_type -> dataloader.Media
+	8,   // 105: dataloader.DataLoader.createMedia:output_type -> dataloader.Media
+	12,  // 106: dataloader.DataLoader.createMediaStream:output_type -> dataloader.CreateMediaStreamResponse
+	4,   // 107: dataloader.DataLoader.deleteMedia:output_type -> dataloader.Empty
+	17,  // 108: dataloader.DataLoader.getTagSets:output_type -> dataloader.StreamingTagSetResponse
+	13,  // 109: dataloader.DataLoader.getTagSetById:output_type -> dataloader.TagSet
+	18,  // 110: dataloader.DataLoader.getTagSetsById:output_type -> dataloader.TagSetsResponse
+	13,  // 111: dataloader.DataLoader.getTagSetByName:output_type -> dataloader.TagSet
+	13,  // 112: dataloader.DataLoader.createTagSet:output_type -> dataloader.TagSet
+	28,  // 113: dataloader.DataLoader.getTags:output_type -> dataloader.StreamingTagResponse
+	19,  // 114: dataloader.DataLoader.getTag:output_type -> dataloader.Tag
+	19,  // 115: dataloader.DataLoader.createTag:output_type -> dataloader.Tag
+	30,  // 116: dataloader.DataLoader.createTagStream:output_type -> dataloader.CreateTagStreamResponse
+	4,   // 117: dataloader.DataLoader.changeTagName:output_type -> dataloader.Empty
+	34,  // 118: dataloader.DataLoader.getTaggings:output_type -> dataloader.StreamingTaggingResponse
+	7,   // 119: dataloader.DataLoader.getMediasWithTag:output_type -> dataloader.RepeatedIdResponse
+	7,   // 120: dataloader.DataLoader.getMediaTags:output_type -> dataloader.RepeatedIdResponse
+	32,  // 121: dataloader.DataLoader.createTagging:output_type -> dataloader.Tagging
+	35,  // 122: dataloader.DataLoader.createTaggingStream:output_type -> dataloader.CreateTaggingStreamResponse
+	4,   // 123: dataloader.DataLoader.changeTagging:output_type -> dataloader.Empty
+	40,  // 124: dataloader.DataLoader.getHierarchies:output_type -> dataloader.StreamingHierarchyResponse
+	37,  // 125: dataloader.DataLoader.getHierarchy:output_type -> dataloader.Hierarchy
+	37,  // 126: dataloader.DataLoader.createHierarchy:output_type -> dataloader.Hierarchy
+	44,  // 127: dataloader.DataLoader.getNodes:output_type -> dataloader.StreamingNodeResponse
+	41,  // 128: dataloader.DataLoader.getNode:output_type -> dataloader.Node
+	45,  // 129: dataloader.DataLoader.getChildNodes:output_type -> dataloader.ChildNodeResponse
+	41,  // 130: dataloader.DataLoader.createNode:output_type -> dataloader.Node
+	44,  // 131: dataloader.DataLoader.createNodeStream:output_type -> dataloader.StreamingNodeResponse
+	4,   // 132: dataloader.DataLoader.deleteNode:output_type -> dataloader.Empty
+	55,  // 133: dataloader.DataLoader.getCell:output_type -> dataloader.BrowsingStateResponse
+	55,  // 134: dataloader.DataLoader.getBrowsingState:output_type -> dataloader.BrowsingStateResponse
+	55,  // 135: dataloader.DataLoader.getBrowsingState2:output_type -> dataloader.BrowsingStateResponse
+	55,  // 136: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesIncrementalGrouping:output_type -> dataloader.BrowsingStateResponse
+	55,  // 137: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesSingles:output_type -> dataloader.BrowsingStateResponse
+	55,  // 138: dataloader.DataLoader.getBrowsingStateDistinctBranchesFull:output_type -> dataloader.BrowsingStateResponse
+	55,  // 139: dataloader.DataLoader.getBrowsingStateDistinctBranchesIncrementalGrouping:output_type -> dataloader.BrowsingStateResponse
+	55,  // 140: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesDeduplicatedSingles:output_type -> dataloader.BrowsingStateResponse
+	55,  // 141: dataloader.DataLoader.getBrowsingStateNonDistinctBranchesFull:output_type -> dataloader.BrowsingStateResponse
+	4,   // 142: dataloader.DataLoader.resetDatabase:output_type -> dataloader.Empty
+	102, // [102:143] is the sub-list for method output_type
+	61,  // [61:102] is the sub-list for method input_type
+	61,  // [61:61] is the sub-list for extension type_name
+	61,  // [61:61] is the sub-list for extension extendee
+	0,   // [0:61] is the sub-list for field type_name
 }
 
 func init() { file_dataloader_proto_init() }
@@ -4651,7 +4721,7 @@ func file_dataloader_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dataloader_proto_rawDesc), len(file_dataloader_proto_rawDesc)),
-			NumEnums:      3,
+			NumEnums:      4,
 			NumMessages:   55,
 			NumExtensions: 0,
 			NumServices:   1,

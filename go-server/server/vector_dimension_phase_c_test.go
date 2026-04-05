@@ -15,7 +15,7 @@ import (
 
 func TestVectorSearchCacheTryGetReturnsLimitedCopy(t *testing.T) {
 	cache := newVectorSearchCache(2, time.Minute)
-	cache.Put("siglip2", 1, searchResult{
+	cache.Put("siglip2", 1, 0, searchResult{
 		RawNeighbors: []Neighbor{
 			{ObjectID: 1, Distance: 0.1},
 			{ObjectID: 2, Distance: 0.2},
@@ -24,7 +24,7 @@ func TestVectorSearchCacheTryGetReturnsLimitedCopy(t *testing.T) {
 		DistanceMetric: "cosine",
 	}, 3)
 
-	got, ok := cache.TryGet("siglip2", 1, 2)
+	got, ok := cache.TryGet("siglip2", 1, 0, 2)
 	if !ok {
 		t.Fatal("expected cache hit")
 	}
@@ -33,7 +33,7 @@ func TestVectorSearchCacheTryGetReturnsLimitedCopy(t *testing.T) {
 	}
 
 	got.RawNeighbors[0].ObjectID = 99
-	again, ok := cache.TryGet("siglip2", 1, 3)
+	again, ok := cache.TryGet("siglip2", 1, 0, 3)
 	if !ok {
 		t.Fatal("expected second cache hit")
 	}
@@ -46,25 +46,25 @@ func TestVectorSearchCacheExpiresEntries(t *testing.T) {
 	now := time.Date(2026, 3, 12, 0, 0, 0, 0, time.UTC)
 	cache := newVectorSearchCache(2, time.Minute)
 	cache.now = func() time.Time { return now }
-	cache.Put("siglip2", 1, searchResult{RawNeighbors: []Neighbor{{ObjectID: 1, Distance: 0.1}}}, 1)
+	cache.Put("siglip2", 1, 0, searchResult{RawNeighbors: []Neighbor{{ObjectID: 1, Distance: 0.1}}}, 1)
 
 	now = now.Add(2 * time.Minute)
-	if _, ok := cache.TryGet("siglip2", 1, 1); ok {
+	if _, ok := cache.TryGet("siglip2", 1, 0, 1); ok {
 		t.Fatal("expected expired cache miss")
 	}
 }
 
 func TestVectorSearchCacheEvictsLeastRecentlyUsed(t *testing.T) {
 	cache := newVectorSearchCache(2, time.Minute)
-	cache.Put("siglip2", 1, searchResult{RawNeighbors: []Neighbor{{ObjectID: 1, Distance: 0.1}}}, 1)
-	cache.Put("siglip2", 2, searchResult{RawNeighbors: []Neighbor{{ObjectID: 2, Distance: 0.2}}}, 1)
+	cache.Put("siglip2", 1, 0, searchResult{RawNeighbors: []Neighbor{{ObjectID: 1, Distance: 0.1}}}, 1)
+	cache.Put("siglip2", 2, 0, searchResult{RawNeighbors: []Neighbor{{ObjectID: 2, Distance: 0.2}}}, 1)
 
-	if _, ok := cache.TryGet("siglip2", 1, 1); !ok {
+	if _, ok := cache.TryGet("siglip2", 1, 0, 1); !ok {
 		t.Fatal("expected cache hit for key 1")
 	}
 
-	cache.Put("siglip2", 3, searchResult{RawNeighbors: []Neighbor{{ObjectID: 3, Distance: 0.3}}}, 1)
-	if _, ok := cache.TryGet("siglip2", 2, 1); ok {
+	cache.Put("siglip2", 3, 0, searchResult{RawNeighbors: []Neighbor{{ObjectID: 3, Distance: 0.3}}}, 1)
+	if _, ok := cache.TryGet("siglip2", 2, 0, 1); ok {
 		t.Fatal("expected key 2 to be evicted")
 	}
 }

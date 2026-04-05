@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"strings"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -139,7 +140,11 @@ func (s *DataLoaderServer) handleVectorDimension(
 		return nil, nil
 	}
 
-	result, err := s.searchNeighbors(ctx, cfg)
+	inputs, err := s.resolveVectorSearchInputs(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+	result, err := s.searchNeighbors(ctx, cfg, inputs)
 	if err != nil {
 		return nil, err
 	}
@@ -151,56 +156,21 @@ func (s *DataLoaderServer) resolveVectorDimensionWithCache(
 	cfg *pb.VectorSearchDimension,
 	rebucketOnly bool,
 ) (*vectorDimensionResult, error) {
-	if err := validateVectorDimensionConfig(cfg); err != nil {
-		return nil, err
-	}
-	if cfg == nil {
-		return nil, nil
-	}
-
-	refHash, err := hashVectorReference(cfg.GetReference())
-	if err != nil {
-		return nil, err
-	}
-
-	cache := s.ensureVectorCache()
-	modelName := strings.TrimSpace(cfg.GetModelName())
-	if rebucketOnly {
-		result, ok := cache.TryGet(modelName, refHash, cfg.GetMaxResults())
-		if !ok {
-			return nil, status.Error(codes.FailedPrecondition, "rebucket_only: no cached search results for this model+reference; re-send without rebucket_only to trigger a new search")
-		}
-		return bucketSearchResult(cfg, result)
-	}
-
-	result, err := s.searchNeighbors(ctx, cfg)
-	if err != nil {
-		return nil, err
-	}
-	cache.Put(modelName, refHash, result, cfg.GetMaxResults())
-	return bucketSearchResult(cfg, result)
+	return s.resolveVectorDimensionForMetadata(ctx, cfg, nil, nil, rebucketOnly, Auto)
 }
 
 func (s *DataLoaderServer) searchNeighbors(
 	ctx context.Context,
 	cfg *pb.VectorSearchDimension,
+	inputs *vectorSearchInputs,
 ) (searchResult, error) {
-	modelInfo, err := s.resolveModelInfo(ctx, cfg.GetModelName())
-	if err != nil {
-		return searchResult{}, err
+	if inputs == nil || inputs.ModelInfo == nil {
+		return searchResult{}, status.Error(codes.FailedPrecondition, "vector search inputs are not configured")
 	}
 
-	queryVector, err := s.vectorFilters.resolveQueryVector(ctx, &pb.VectorFilterConfig{
-		ModelName: cfg.GetModelName(),
-		Reference: cfg.GetReference(),
-		K:         cfg.GetMaxResults(),
-	})
-	if err != nil {
-		return searchResult{}, err
-	}
-
+	start := time.Now()
 	resp, err := s.vectorFilters.client.KNN(ctx, &kvstorev1.KNNRequest{
-		Query: &kvstorev1.Vector{Values: queryVector},
+		Query: &kvstorev1.Vector{Values: inputs.QueryVector},
 		K:     cfg.GetMaxResults(),
 		Model: strings.TrimSpace(cfg.GetModelName()),
 	})
@@ -208,10 +178,21 @@ func (s *DataLoaderServer) searchNeighbors(
 		return searchResult{}, wrapVectorKVError("vector_dimension search", err)
 	}
 
-	return searchResult{
+	result := searchResult{
 		RawNeighbors:   neighborsFromProto(resp.GetNeighbors()),
-		DistanceMetric: modelInfo.GetDistanceMetric(),
-	}, nil
+		DistanceMetric: inputs.ModelInfo.GetDistanceMetric(),
+		Kind:           searchKindGlobalKNN,
+	}
+	logBenchmarkEvent(ctx, "vector_search_done", map[string]any{
+		"model_name":       inputs.ModelInfo.GetName(),
+		"search_kind":      result.Kind.String(),
+		"vector_search_ms": durationMillis(start),
+		"result_count":     len(result.RawNeighbors),
+		"candidate_count":  0,
+		"distance_metric":  inputs.ModelInfo.GetDistanceMetric(),
+		"requested_k":      cfg.GetMaxResults(),
+	})
+	return result, nil
 }
 
 func bucketSearchResult(cfg *pb.VectorSearchDimension, result searchResult) (*vectorDimensionResult, error) {

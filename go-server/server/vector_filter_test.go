@@ -16,19 +16,23 @@ import (
 )
 
 type stubVectorSearchClient struct {
-	getResp        *kvstorev1.GetResponse
-	getErr         error
-	knnResp        *kvstorev1.KNNResponse
-	knnErr         error
-	listModelsResp *kvstorev1.ListModelsResponse
-	listModelsErr  error
+	getResp         *kvstorev1.GetResponse
+	getErr          error
+	knnResp         *kvstorev1.KNNResponse
+	knnErr          error
+	filteredKNNResp *kvstorev1.KNNResponse
+	filteredKNNErr  error
+	listModelsResp  *kvstorev1.ListModelsResponse
+	listModelsErr   error
 
-	gotGet        *kvstorev1.GetRequest
-	gotKNN        *kvstorev1.KNNRequest
-	gotListModels *kvstorev1.ListModelsRequest
-	getCalls      int
-	knnCalls      int
-	listCalls     int
+	gotGet         *kvstorev1.GetRequest
+	gotKNN         *kvstorev1.KNNRequest
+	gotFilteredKNN *kvstorev1.FilteredKNNRequest
+	gotListModels  *kvstorev1.ListModelsRequest
+	getCalls       int
+	knnCalls       int
+	filteredCalls  int
+	listCalls      int
 }
 
 func (s *stubVectorSearchClient) Get(_ context.Context, req *kvstorev1.GetRequest, _ ...grpc.CallOption) (*kvstorev1.GetResponse, error) {
@@ -41,6 +45,12 @@ func (s *stubVectorSearchClient) KNN(_ context.Context, req *kvstorev1.KNNReques
 	s.gotKNN = req
 	s.knnCalls++
 	return s.knnResp, s.knnErr
+}
+
+func (s *stubVectorSearchClient) FilteredKNN(_ context.Context, req *kvstorev1.FilteredKNNRequest, _ ...grpc.CallOption) (*kvstorev1.KNNResponse, error) {
+	s.gotFilteredKNN = req
+	s.filteredCalls++
+	return s.filteredKNNResp, s.filteredKNNErr
 }
 
 func (s *stubVectorSearchClient) ListModels(_ context.Context, req *kvstorev1.ListModelsRequest, _ ...grpc.CallOption) (*kvstorev1.ListModelsResponse, error) {

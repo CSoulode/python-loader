@@ -2,18 +2,9 @@ package main
 
 import (
 	"container/list"
-	"encoding/binary"
-	"hash"
-	"hash/fnv"
-	"math"
 	"strings"
 	"sync"
 	"time"
-
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
-	pb "m3.dataloader/dataloader"
 )
 
 const (
@@ -21,19 +12,10 @@ const (
 	defaultVectorCacheTTL        = 5 * time.Minute
 )
 
-type searchResult struct {
-	RawNeighbors   []Neighbor
-	DistanceMetric string
-}
-
-type Neighbor struct {
-	ObjectID int32
-	Distance float64
-}
-
 type cacheKey struct {
-	ModelName string
-	RefHash   uint64
+	ModelName  string
+	RefHash    uint64
+	FilterHash uint64
 }
 
 type cacheEntry struct {
@@ -77,7 +59,31 @@ func (s *DataLoaderServer) ensureVectorCache() *VectorSearchCache {
 	return s.vectorCache
 }
 
-func (c *VectorSearchCache) TryGet(modelName string, refHash uint64, reqK int32) (searchResult, bool) {
+func (c *VectorSearchCache) TryGet(
+	modelName string,
+	refHash uint64,
+	filterHash uint64,
+	reqK int32,
+) (searchResult, bool) {
+	return c.tryGet(modelName, refHash, filterHash, reqK, searchKindUnknown)
+}
+
+func (c *VectorSearchCache) TryGetGlobalKNN(
+	modelName string,
+	refHash uint64,
+	filterHash uint64,
+	reqK int32,
+) (searchResult, bool) {
+	return c.tryGet(modelName, refHash, filterHash, reqK, searchKindGlobalKNN)
+}
+
+func (c *VectorSearchCache) tryGet(
+	modelName string,
+	refHash uint64,
+	filterHash uint64,
+	reqK int32,
+	requiredKind SearchKind,
+) (searchResult, bool) {
 	if c == nil {
 		return searchResult{}, false
 	}
@@ -86,7 +92,7 @@ func (c *VectorSearchCache) TryGet(modelName string, refHash uint64, reqK int32)
 	defer c.mu.Unlock()
 
 	now := c.now()
-	key := newCacheKey(modelName, refHash)
+	key := newCacheKey(modelName, refHash, filterHash)
 	element, ok := c.entries[key]
 	if !ok {
 		return searchResult{}, false
@@ -99,13 +105,22 @@ func (c *VectorSearchCache) TryGet(modelName string, refHash uint64, reqK int32)
 		}
 		return searchResult{}, false
 	}
+	if requiredKind != searchKindUnknown && entry.Result.Kind != requiredKind {
+		return searchResult{}, false
+	}
 
 	entry.LastAccessAt = now
 	c.lru.MoveToFront(element)
 	return cloneSearchResult(limitSearchResult(entry.Result, reqK)), true
 }
 
-func (c *VectorSearchCache) Put(modelName string, refHash uint64, result searchResult, reqK int32) {
+func (c *VectorSearchCache) Put(
+	modelName string,
+	refHash uint64,
+	filterHash uint64,
+	result searchResult,
+	reqK int32,
+) {
 	if c == nil {
 		return
 	}
@@ -115,7 +130,7 @@ func (c *VectorSearchCache) Put(modelName string, refHash uint64, result searchR
 
 	now := c.now()
 	c.purgeExpired(now)
-	key := newCacheKey(modelName, refHash)
+	key := newCacheKey(modelName, refHash, filterHash)
 	if element, ok := c.entries[key]; ok {
 		c.updateEntry(element.Value.(*cacheEntry), result, reqK, now)
 		c.lru.MoveToFront(element)
@@ -128,7 +143,12 @@ func (c *VectorSearchCache) Put(modelName string, refHash uint64, result searchR
 	c.evictOverflow()
 }
 
-func (c *VectorSearchCache) updateEntry(entry *cacheEntry, result searchResult, reqK int32, now time.Time) {
+func (c *VectorSearchCache) updateEntry(
+	entry *cacheEntry,
+	result searchResult,
+	reqK int32,
+	now time.Time,
+) {
 	entry.Result = cloneSearchResult(result)
 	entry.K = reqK
 	entry.LastAccessAt = now
@@ -171,65 +191,10 @@ func (c *VectorSearchCache) isExpired(entry *cacheEntry, now time.Time) bool {
 	return c.ttl > 0 && now.Sub(entry.CreatedAt) >= c.ttl
 }
 
-func newCacheKey(modelName string, refHash uint64) cacheKey {
+func newCacheKey(modelName string, refHash uint64, filterHash uint64) cacheKey {
 	return cacheKey{
-		ModelName: strings.TrimSpace(modelName),
-		RefHash:   refHash,
+		ModelName:  strings.TrimSpace(modelName),
+		RefHash:    refHash,
+		FilterHash: filterHash,
 	}
-}
-
-func hashVectorReference(ref *pb.VectorReference) (uint64, error) {
-	if ref == nil {
-		return 0, status.Error(codes.InvalidArgument, "vector reference is required")
-	}
-
-	hasher := fnv.New64a()
-	switch value := ref.GetRef().(type) {
-	case *pb.VectorReference_ObjectId:
-		var data [5]byte
-		data[0] = 'o'
-		binary.LittleEndian.PutUint32(data[1:], uint32(value.ObjectId))
-		_, _ = hasher.Write(data[:])
-	case *pb.VectorReference_RawEmbedding:
-		_, _ = hasher.Write([]byte{'r'})
-		writeFloat32SliceHash(hasher, value.RawEmbedding.GetValues())
-	default:
-		return 0, status.Error(codes.InvalidArgument, "vector reference must set object_id or raw_embedding")
-	}
-
-	return hasher.Sum64(), nil
-}
-
-func writeFloat32SliceHash(hasher hash.Hash64, values []float32) {
-	var data [4]byte
-	for _, value := range values {
-		binary.LittleEndian.PutUint32(data[:], math.Float32bits(value))
-		_, _ = hasher.Write(data[:])
-	}
-}
-
-func limitSearchResult(result searchResult, reqK int32) searchResult {
-	if reqK <= 0 || len(result.RawNeighbors) <= int(reqK) {
-		return result
-	}
-
-	limited := cloneNeighbors(result.RawNeighbors[:reqK])
-	return searchResult{RawNeighbors: limited, DistanceMetric: result.DistanceMetric}
-}
-
-func cloneSearchResult(result searchResult) searchResult {
-	return searchResult{
-		RawNeighbors:   cloneNeighbors(result.RawNeighbors),
-		DistanceMetric: result.DistanceMetric,
-	}
-}
-
-func cloneNeighbors(neighbors []Neighbor) []Neighbor {
-	if len(neighbors) == 0 {
-		return nil
-	}
-
-	cloned := make([]Neighbor, len(neighbors))
-	copy(cloned, neighbors)
-	return cloned
 }

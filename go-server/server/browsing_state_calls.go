@@ -28,7 +28,6 @@ import (
 const (
 	statePreviewLimit = 64                     // Phase-1 quick preview rows
 	idChunkSize       = 10                     // IDs per final-select chunk (Incremental 2)
-	streamBatchSize   = 10240                  // CellResponse messages per flush
 	batchSize         = 10240                  // send once we have this many rows
 	flushInterval     = 50 * time.Millisecond  // or at least this often
 	maxFirstFlush     = 150 * time.Millisecond // ensure first batch <~ 150ms
@@ -1626,6 +1625,7 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesIncrementalGroupin
 		return fmt.Errorf("GetBrowsingStateNonDistinctBranchesIncrementalGrouping state query: %w", err)
 	}
 	defer rows.Close()
+	sqlExecStart := time.Now()
 
 	// Keep old large buffers for perf baseline
 	dirtyCh := make(chan cellKey, 65536)
@@ -1729,6 +1729,11 @@ scanLoop:
 		m.LogSummary("rows_err=true")
 		return fmt.Errorf("GetBrowsingStateNonDistinctBranchesIncrementalGrouping rows: %w", err)
 	}
+	logBenchmarkEvent(ctx, "sql_exec_done", map[string]any{
+		"path":        "ssb",
+		"sql_exec_ms": durationMillis(sqlExecStart),
+		"rows_read":   atomic.LoadInt64(&m.RowsRead),
+	})
 
 	close(dirtyCh)
 	if err := <-errCh; err != nil {

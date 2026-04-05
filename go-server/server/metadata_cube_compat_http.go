@@ -885,6 +885,7 @@ func GetMetaDataCubeCompatCellHandler(server *DataLoaderServer) http.HandlerFunc
 			strings.TrimSpace(req.All) != "",
 			strings.TrimSpace(req.Timeline) != "",
 			rebucketOnly,
+			Auto,
 		)
 		if err != nil {
 			http.Error(w, vectorFilterHTTPMessage(err), mapVectorFilterHTTPStatus(err))

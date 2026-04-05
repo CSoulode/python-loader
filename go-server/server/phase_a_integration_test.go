@@ -20,7 +20,9 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 
 	pb "m3.dataloader/dataloader"
 	kvstorev1 "vectorkv/api/kvstore/v1/gen"
@@ -30,9 +32,12 @@ const phaseATestDatabaseEnv = "PHASE_A_TEST_DATABASE_URL"
 
 type fakeVectorKVServer struct {
 	kvstorev1.UnimplementedVectorKVServer
-	getCalls        int32
-	knnCalls        int32
-	listModelsCalls int32
+	getCalls         int32
+	knnCalls         int32
+	filteredKNNCalls int32
+	listModelsCalls  int32
+	annIndex         string
+	iterativeScan    bool
 }
 
 func (s *fakeVectorKVServer) Get(_ context.Context, req *kvstorev1.GetRequest) (*kvstorev1.GetResponse, error) {
@@ -75,15 +80,55 @@ func (s *fakeVectorKVServer) KNN(_ context.Context, req *kvstorev1.KNNRequest) (
 	return &kvstorev1.KNNResponse{Neighbors: filtered}, nil
 }
 
+func (s *fakeVectorKVServer) FilteredKNN(_ context.Context, req *kvstorev1.FilteredKNNRequest) (*kvstorev1.KNNResponse, error) {
+	atomic.AddInt32(&s.filteredKNNCalls, 1)
+	if req.GetModel() != "siglip2" {
+		return nil, fmt.Errorf("unexpected model %q", req.GetModel())
+	}
+	if req.GetK() <= 0 {
+		return nil, fmt.Errorf("unexpected k %d", req.GetK())
+	}
+
+	allowed := make(map[int32]struct{}, len(req.GetCandidateIds()))
+	for _, candidateID := range req.GetCandidateIds() {
+		allowed[candidateID] = struct{}{}
+	}
+	all := []*kvstorev1.Neighbor{
+		{Id: 1, Distance: 0},
+		{Id: 2, Distance: 0.25},
+		{Id: 3, Distance: 0.75},
+	}
+	filtered := make([]*kvstorev1.Neighbor, 0, len(all))
+	for _, neighbor := range all {
+		if _, ok := allowed[neighbor.GetId()]; !ok {
+			continue
+		}
+		filtered = append(filtered, neighbor)
+		if int32(len(filtered)) == req.GetK() {
+			break
+		}
+	}
+	if len(filtered) == 0 {
+		return nil, status.Error(codes.NotFound, "not found")
+	}
+	return &kvstorev1.KNNResponse{Neighbors: filtered}, nil
+}
+
 func (s *fakeVectorKVServer) ListModels(_ context.Context, _ *kvstorev1.ListModelsRequest) (*kvstorev1.ListModelsResponse, error) {
 	atomic.AddInt32(&s.listModelsCalls, 1)
+	annIndex := s.annIndex
+	if annIndex == "" {
+		annIndex = "hnsw"
+	}
 	return &kvstorev1.ListModelsResponse{
 		DefaultModel: "siglip2",
 		Models: []*kvstorev1.ModelInfo{{
-			Name:           "siglip2",
-			Dim:            3,
-			TagsetName:     "SigLIP2",
-			DistanceMetric: "cosine",
+			Name:                   "siglip2",
+			Dim:                    3,
+			TagsetName:             "SigLIP2",
+			DistanceMetric:         "cosine",
+			AnnIndex:               annIndex,
+			IterativeScanAvailable: s.iterativeScan,
 		}},
 	}, nil
 }
@@ -98,6 +143,10 @@ func (s *fakeVectorKVServer) KNNCallCount() int32 {
 
 func (s *fakeVectorKVServer) ListModelsCallCount() int32 {
 	return atomic.LoadInt32(&s.listModelsCalls)
+}
+
+func (s *fakeVectorKVServer) FilteredKNNCallCount() int32 {
+	return atomic.LoadInt32(&s.filteredKNNCalls)
 }
 
 type phaseATestEnv struct {
