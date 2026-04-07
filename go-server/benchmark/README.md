@@ -48,10 +48,13 @@ Common flags:
 
 - The benchmark builds fresh `vectorkv` and `go-server` binaries into `docs/experiments/phase_d/.tmp/`.
 - Services are started and stopped by the benchmark. `vectorkv` readiness uses gRPC health. `go-server` readiness uses `GET /api/vector/models`.
+- Experiment 1 uses the full selectivity grid: `1%, 5%, 10%, 20%, 30%, 40%, 50%, 100%`.
+- Experiment 2 uses a structured estimation matrix: `4 complexities × 7 selectivities × 2 repeats = 56` queries.
+- Experiment 3 and Experiment 4 use representative mixed-query samples with target selectivities `5%, 10%, 30%`.
 - Experiment 1-4 run on the default HNSW runtime.
 - Experiment 5 rebuilds HNSW, IVFFlat, DiskANN, and no-index baselines.
-- Experiment 6 rebuilds HNSW and IVFFlat with iterative-scan modes.
-- Experiment 7 rebuilds SigLIP2 full/half HNSW and full/half DiskANN indexes.
+- Experiment 6 rebuilds HNSW and IVFFlat with iterative-scan modes across `1%, 5%, 10%, 20%, 30%, 40%, 50%`.
+- Experiment 7 keeps the query unfiltered (`selectivity=1.0`) and rebuilds SigLIP2 full/half HNSW plus full DiskANN indexes.
 
 ## Output
 

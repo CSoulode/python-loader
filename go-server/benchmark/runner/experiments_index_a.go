@@ -10,7 +10,7 @@ import (
 )
 
 func (r *BenchRunner) RunExperiment5(ctx context.Context) error {
-	rows := make([][]string, 0, len(r.opts.Datasets)*len(r.catalog.Models)*len(defaultSelectivities)*len(defaultKValues)*4)
+	rows := make([][]string, 0, len(r.opts.Datasets)*len(r.catalog.Models)*len(fullSelectivities)*len(defaultKValues)*4)
 	specs := []benchindex.Spec{
 		{Type: benchindex.HNSW, Precision: benchindex.FullPrecision, IterativeMode: benchindex.IterativeOff},
 		{Type: benchindex.IVFFlat, Precision: benchindex.FullPrecision, IterativeMode: benchindex.IterativeOff},
@@ -47,9 +47,9 @@ func (r *BenchRunner) runIndexComparisonCases(
 	rebuild map[string]*benchindex.RebuildResult,
 ) ([][]string, error) {
 	state := SelectivityBenchmarkState()
-	rows := make([][]string, 0, len(r.catalog.Models)*len(defaultSelectivities)*len(defaultKValues))
+	rows := make([][]string, 0, len(r.catalog.Models)*len(fullSelectivities)*len(defaultKValues))
 	for modelIndex, model := range r.catalog.Models {
-		for selIndex, selectivity := range defaultSelectivities {
+		for selIndex, selectivity := range fullSelectivities {
 			query, err := BuildBenchmarkQuery(ctx, session.DB, state, model, selectivity, expQueryID("q", modelIndex*10+selIndex), modelIndex*100+selIndex)
 			if err != nil {
 				return nil, err

@@ -195,7 +195,7 @@ func buildMixedQueries(
 		db,
 		MixedBenchmarkStates(),
 		model,
-		[]float64{0.05, 0.10, 0.30},
+		mixedTargetSelectivities,
 		limit,
 		minMixedCandidateCount,
 		"q",

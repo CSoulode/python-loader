@@ -14,9 +14,13 @@ const (
 )
 
 var (
-	defaultSelectivities = []float64{0.01, 0.05, 0.10, 0.30, 0.50, 1.0}
-	defaultKValues       = []int32{100, 500, 1000, 5000}
+	fullSelectivities        = []float64{0.01, 0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 1.0}
+	filteredSelectivities    = []float64{0.01, 0.05, 0.10, 0.20, 0.30, 0.40, 0.50}
+	mixedTargetSelectivities = []float64{0.05, 0.10, 0.30}
+	defaultKValues           = []int32{100, 500, 1000, 5000}
 )
+
+const exp2RepeatCount = 2
 
 type MeasuredStream struct {
 	Summary StreamSummary

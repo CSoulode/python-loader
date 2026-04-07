@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 
@@ -16,9 +17,7 @@ func (r *BenchRunner) RunExperiment6(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	selectivities := []float64{0.01, 0.05, 0.10, 0.30, 0.50}
 	state := SelectivityBenchmarkState()
-	rows := make([][]string, 0, len(r.opts.Datasets)*len(selectivities)*5)
 	specs := []benchindex.Spec{
 		{Type: benchindex.HNSW, Precision: benchindex.FullPrecision, IterativeMode: benchindex.IterativeOff},
 		{Type: benchindex.HNSW, Precision: benchindex.FullPrecision, IterativeMode: benchindex.IterativeStrict},
@@ -26,11 +25,12 @@ func (r *BenchRunner) RunExperiment6(ctx context.Context) error {
 		{Type: benchindex.IVFFlat, Precision: benchindex.FullPrecision, IterativeMode: benchindex.IterativeOff},
 		{Type: benchindex.IVFFlat, Precision: benchindex.FullPrecision, IterativeMode: benchindex.IterativeRelaxed},
 	}
+	rows := make([][]string, 0, len(r.opts.Datasets)*len(filteredSelectivities)*len(specs))
 	for _, dataset := range r.opts.Datasets {
 		for _, spec := range specs {
 			err := r.withIndexedSession(ctx, dataset, spec, []BenchmarkModel{model}, func(session *ActiveSession, _ map[string]*benchindex.RebuildResult) error {
 				manager := benchindex.NewManager(session.DB)
-				for index, selectivity := range selectivities {
+				for index, selectivity := range filteredSelectivities {
 					query, err := BuildBenchmarkQuery(ctx, session.DB, state, model, selectivity, expQueryID("q", index), index)
 					if err != nil {
 						return err
@@ -183,23 +183,20 @@ func iterativeExplainSetup(spec benchindex.Spec, k int) []string {
 }
 
 func writeExplainPlan(dir string, dataset DatasetID, spec benchindex.Spec, selectivity float64, plan string) error {
-	filename := fmt.Sprintf("%s_%s_%s_sel%s.txt", dataset, spec.Type, spec.IterativeMode, selectivitySuffix(selectivity))
+	suffix, err := selectivitySuffix(selectivity)
+	if err != nil {
+		return err
+	}
+	filename := fmt.Sprintf("%s_%s_%s_sel%s.txt", dataset, spec.Type, spec.IterativeMode, suffix)
 	return os.WriteFile(filepath.Join(dir, filename), []byte(plan), 0o644)
 }
 
-func selectivitySuffix(value float64) string {
-	switch value {
-	case 0.01:
-		return "001"
-	case 0.05:
-		return "005"
-	case 0.10:
-		return "010"
-	case 0.30:
-		return "030"
-	case 0.50:
-		return "050"
+func selectivitySuffix(value float64) (string, error) {
+	percent := int(math.Round(value * 100))
+	switch percent {
+	case 1, 5, 10, 20, 30, 40, 50, 100:
+		return fmt.Sprintf("%03d", percent), nil
 	default:
-		return "100"
+		return "", fmt.Errorf("unsupported explain-plan selectivity %.6f", value)
 	}
 }

@@ -15,10 +15,10 @@ func (r *BenchRunner) RunExperiment1(ctx context.Context) error {
 		return err
 	}
 	state := SelectivityBenchmarkState()
-	rows := make([][]string, 0, len(r.opts.Datasets)*len(defaultSelectivities)*len(defaultKValues)*4)
+	rows := make([][]string, 0, len(r.opts.Datasets)*len(fullSelectivities)*len(defaultKValues)*4)
 	for _, dataset := range r.opts.Datasets {
 		err := r.withDefaultSession(ctx, dataset, func(session *ActiveSession) error {
-			for selIndex, selectivity := range defaultSelectivities {
+			for selIndex, selectivity := range fullSelectivities {
 				query, err := BuildBenchmarkQuery(ctx, session.DB, state, model, selectivity, expQueryID("exp1", selIndex), selIndex)
 				if err != nil {
 					return err
@@ -88,7 +88,8 @@ func (r *BenchRunner) RunExperiment2(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	rows := make([][]string, 0, len(r.opts.Datasets)*50)
+	queryCount := len(DefaultRepresentativeStates()) * len(filteredSelectivities) * exp2RepeatCount
+	rows := make([][]string, 0, len(r.opts.Datasets)*queryCount)
 	for _, dataset := range r.opts.Datasets {
 		err := r.withDefaultSession(ctx, dataset, func(session *ActiveSession) error {
 			queries, err := buildEstimationQueries(ctx, session.DB, model)
@@ -187,24 +188,26 @@ func buildEstimationQueries(
 	model BenchmarkModel,
 ) ([]*BenchmarkQuery, error) {
 	states := DefaultRepresentativeStates()
-	selectivities := []float64{0.01, 0.05, 0.10, 0.30, 0.50}
-	queries := make([]*BenchmarkQuery, 0, 50)
-	for index := 0; index < 50; index++ {
-		state := states[index%len(states)]
-		selectivity := selectivities[index%len(selectivities)]
-		query, err := BuildBenchmarkQuery(
-			ctx,
-			db,
-			state,
-			model,
-			selectivity,
-			expQueryID("q", index),
-			index,
-		)
-		if err != nil {
-			return nil, err
+	queries := make([]*BenchmarkQuery, 0, len(states)*len(filteredSelectivities)*exp2RepeatCount)
+	for repeat := 0; repeat < exp2RepeatCount; repeat++ {
+		for _, state := range states {
+			for _, selectivity := range filteredSelectivities {
+				index := len(queries)
+				query, err := BuildBenchmarkQuery(
+					ctx,
+					db,
+					state,
+					model,
+					selectivity,
+					expQueryID("q", index),
+					index,
+				)
+				if err != nil {
+					return nil, err
+				}
+				queries = append(queries, query)
+			}
 		}
-		queries = append(queries, query)
 	}
 	return queries, nil
 }
