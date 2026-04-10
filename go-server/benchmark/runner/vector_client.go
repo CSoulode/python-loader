@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 
 	kvstorev1 "vectorkv/api/kvstore/v1/gen"
 )
@@ -52,6 +54,54 @@ func SearchFilteredKNN(
 		Query:        &kvstorev1.Vector{Values: vector},
 	})
 	if err != nil {
+		return nil, err
+	}
+	return neighborsFromProto(resp.GetNeighbors()), nil
+}
+
+func SearchRange(
+	ctx context.Context,
+	client kvstorev1.VectorKVClient,
+	model string,
+	vector []float32,
+	plan VectorQueryPlan,
+) ([]Neighbor, error) {
+	resp, err := client.RangeSearch(ctx, &kvstorev1.RangeSearchRequest{
+		Model:       model,
+		Query:       &kvstorev1.Vector{Values: vector},
+		MinDistance: plan.DistanceRange.GetMinDistance(),
+		MaxDistance: plan.DistanceRange.GetMaxDistance(),
+		MaxResults:  plan.MaxResults,
+	})
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return neighborsFromProto(resp.GetNeighbors()), nil
+}
+
+func SearchFilteredRange(
+	ctx context.Context,
+	client kvstorev1.VectorKVClient,
+	model string,
+	vector []float32,
+	plan VectorQueryPlan,
+	candidateIDs []int32,
+) ([]Neighbor, error) {
+	resp, err := client.FilteredRangeSearch(ctx, &kvstorev1.FilteredRangeSearchRequest{
+		Model:        model,
+		Query:        &kvstorev1.Vector{Values: vector},
+		CandidateIds: candidateIDs,
+		MinDistance:  plan.DistanceRange.GetMinDistance(),
+		MaxDistance:  plan.DistanceRange.GetMaxDistance(),
+		MaxResults:   plan.MaxResults,
+	})
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return neighborsFromProto(resp.GetNeighbors()), nil

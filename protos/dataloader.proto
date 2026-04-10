@@ -422,6 +422,16 @@ enum HybridStrategy {
   HYBRID = 3;
 }
 
+message DistanceRange {
+  float min_distance = 1;
+  float max_distance = 2;
+}
+
+enum RangeSemantics {
+  DISTANCE = 0;
+  SIMILARITY = 1;
+}
+
 message BucketConfig {
   BucketStrategy strategy = 1;
   int32 count = 2;
@@ -436,6 +446,8 @@ message VectorSearchDimension {
   BucketConfig bucket_cfg = 3;
   int32 max_results = 4;
   AxisType axis = 5;
+  DistanceRange distance_range = 6;
+  RangeSemantics range_semantics = 7;
 }
 
 message BucketInfo {
@@ -443,6 +455,10 @@ message BucketInfo {
   float lower_bound = 2;
   float upper_bound = 3;
   string label = 4;
+}
+
+message BucketInfoList {
+  repeated BucketInfo items = 1;
 }
 
 message GetBrowsingStateRequest {
@@ -454,6 +470,8 @@ message GetBrowsingStateRequest {
   optional int32 vector_bucket_id = 6;
   bool rebucket_only = 7;
   HybridStrategy hybrid_strategy = 8;
+  repeated VectorSearchDimension vector_dimensions = 9;
+  map<string, int32> vector_bucket_ids = 10;
 }
 
 enum FilterValueType {
@@ -489,6 +507,7 @@ message BrowsingStateResponse {
   int32 count = 4; // The value of the cell, e.g. the
   repeated CubeObject cubeObjects = 5;
   repeated BucketInfo bucket_infos = 6;
+  map<string, BucketInfoList> axis_bucket_infos = 7;
 }
 
 message BrowsingStateChunk {

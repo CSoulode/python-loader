@@ -69,6 +69,51 @@ func TestVectorSearchCacheEvictsLeastRecentlyUsed(t *testing.T) {
 	}
 }
 
+func TestVectorSearchCacheRangeSupportsExactAndBallSubsetHits(t *testing.T) {
+	cache := newVectorSearchCache(2, time.Minute)
+	cache.PutForConfig(rangeCacheConfig(3, 0, 0.6), 1, 0, searchResult{
+		RawNeighbors: []Neighbor{
+			{ObjectID: 1, Distance: 0.1},
+			{ObjectID: 2, Distance: 0.2},
+			{ObjectID: 3, Distance: 0.5},
+		},
+		DistanceMetric: "cosine",
+		Kind:           searchKindGlobalRange,
+	})
+
+	exact, ok := cache.TryGetForConfig(rangeCacheConfig(2, 0, 0.6), 1, 0)
+	if !ok || len(exact.RawNeighbors) != 2 {
+		t.Fatalf("exact hit = %v, neighbors = %d", ok, len(exact.RawNeighbors))
+	}
+
+	subset, ok := cache.TryGetForConfig(rangeCacheConfig(2, 0, 0.25), 1, 0)
+	if !ok {
+		t.Fatal("expected ball subset hit")
+	}
+	if !reflect.DeepEqual(subset.RawNeighbors, []Neighbor{
+		{ObjectID: 1, Distance: 0.1},
+		{ObjectID: 2, Distance: 0.2},
+	}) {
+		t.Fatalf("subset neighbors = %+v", subset.RawNeighbors)
+	}
+}
+
+func TestVectorSearchCacheRangeRejectsUnsafeRingSubsetHit(t *testing.T) {
+	cache := newVectorSearchCache(2, time.Minute)
+	cache.PutForConfig(rangeCacheConfig(2, 0.2, 1.0), 1, 0, searchResult{
+		RawNeighbors: []Neighbor{
+			{ObjectID: 1, Distance: 0.2},
+			{ObjectID: 2, Distance: 0.3},
+		},
+		DistanceMetric: "cosine",
+		Kind:           searchKindGlobalRange,
+	})
+
+	if _, ok := cache.TryGetForConfig(rangeCacheConfig(1, 0.5, 1.0), 1, 0); ok {
+		t.Fatal("expected truncated ring subset to miss")
+	}
+}
+
 func TestResolveVectorDimensionWithCacheUsesCachedResults(t *testing.T) {
 	client := &stubVectorSearchClient{
 		getResp: &kvstorev1.GetResponse{Vector: &kvstorev1.Vector{Values: []float32{1, 2, 3}}},
@@ -180,5 +225,16 @@ func testVectorDimensionConfig(strategy pb.BucketStrategy, count int32) *pb.Vect
 		},
 		MaxResults: 3,
 		Axis:       pb.AxisType_Y_AXIS,
+	}
+}
+
+func rangeCacheConfig(maxResults int32, minDistance float32, maxDistance float32) *pb.VectorSearchDimension {
+	return &pb.VectorSearchDimension{
+		ModelName:  "siglip2",
+		MaxResults: maxResults,
+		DistanceRange: &pb.DistanceRange{
+			MinDistance: minDistance,
+			MaxDistance: maxDistance,
+		},
 	}
 }

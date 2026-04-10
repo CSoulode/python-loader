@@ -129,9 +129,18 @@ func (q *BenchmarkQuery) Request(
 	rebucketOnly bool,
 	bucketCfg *pb.BucketConfig,
 ) *pb.GetBrowsingStateRequest {
+	return q.RequestForPlan(KNNPlan(k), strategy, rebucketOnly, bucketCfg)
+}
+
+func (q *BenchmarkQuery) RequestForPlan(
+	plan VectorQueryPlan,
+	strategy pb.HybridStrategy,
+	rebucketOnly bool,
+	bucketCfg *pb.BucketConfig,
+) *pb.GetBrowsingStateRequest {
 	return &pb.GetBrowsingStateRequest{
 		Filters:         cloneAxisFilters(q.MetadataFilters),
-		VectorDimension: newVectorDimension(q.Model, q.ReferenceObjectID, k, bucketCfg, q.VectorAxis),
+		VectorDimension: newVectorDimension(q.Model, q.ReferenceObjectID, plan, bucketCfg, q.VectorAxis),
 		HybridStrategy:  strategy,
 		RebucketOnly:    rebucketOnly,
 	}
@@ -185,17 +194,25 @@ func candidateSQL(filters []qg.ParsedFilter, axes []qg.ParsedAxis) (string, erro
 func newVectorDimension(
 	model BenchmarkModel,
 	objectID int32,
-	k int32,
+	plan VectorQueryPlan,
 	bucketCfg *pb.BucketConfig,
 	axis pb.AxisType,
 ) *pb.VectorSearchDimension {
-	return &pb.VectorSearchDimension{
+	cfg := &pb.VectorSearchDimension{
 		ModelName:  model.Name,
 		Reference:  &pb.VectorReference{Ref: &pb.VectorReference_ObjectId{ObjectId: objectID}},
 		BucketCfg:  cloneBucketConfig(bucketCfg),
-		MaxResults: k,
+		MaxResults: plan.MaxResults,
 		Axis:       axis,
 	}
+	if plan.DistanceRange != nil {
+		cfg.DistanceRange = &pb.DistanceRange{
+			MinDistance: plan.DistanceRange.GetMinDistance(),
+			MaxDistance: plan.DistanceRange.GetMaxDistance(),
+		}
+		cfg.RangeSemantics = pb.RangeSemantics_DISTANCE
+	}
+	return cfg
 }
 
 func reserveVectorAxis(filters []*pb.AxisFilter) (pb.AxisType, error) {

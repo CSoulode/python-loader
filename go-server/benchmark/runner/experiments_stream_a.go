@@ -15,7 +15,7 @@ func (r *BenchRunner) RunExperiment1(ctx context.Context) error {
 		return err
 	}
 	state := SelectivityBenchmarkState()
-	rows := make([][]string, 0, len(r.opts.Datasets)*len(fullSelectivities)*len(defaultKValues)*4)
+	rows := make([][]string, 0, len(r.opts.Datasets)*len(fullSelectivities)*len(defaultKValues)*12)
 	for _, dataset := range r.opts.Datasets {
 		err := r.withDefaultSession(ctx, dataset, func(session *ActiveSession) error {
 			for selIndex, selectivity := range fullSelectivities {
@@ -39,7 +39,7 @@ func (r *BenchRunner) RunExperiment1(ctx context.Context) error {
 	}
 	return WriteCSV(
 		filepath.Join(r.paths.RawDir, "exp1_strategy_comparison.csv"),
-		[]string{"selectivity", "k", "dataset_label", "dataset_size", "strategy", "ttfb_ms", "ttlb_ms", "vector_search_ms", "join_ms"},
+		[]string{"query_mode", "selectivity", "k", "dataset_label", "dataset_size", "strategy", "ttfb_ms", "ttlb_ms", "vector_search_ms", "join_ms"},
 		rows,
 	)
 }
@@ -51,6 +51,40 @@ func (r *BenchRunner) runStrategyComparisonCases(
 	query *BenchmarkQuery,
 	k int32,
 ) ([][]string, error) {
+	vector, err := fetchReferenceVector(ctx, session, query)
+	if err != nil {
+		return nil, err
+	}
+	candidateIDs := []int32(nil)
+	if query.TargetSelectivity < 1.0 {
+		candidateIDs, err = LoadModelCandidateIDs(ctx, session.DB, query)
+		if err != nil {
+			return nil, err
+		}
+	}
+	plans, err := BuildVectorPlans(ctx, session.DB, query, vector, candidateIDs, k)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([][]string, 0, len(plans)*4)
+	for _, plan := range plans {
+		currentRows, err := r.runStrategyComparisonPlanCases(ctx, session, dataset, query, plan)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, currentRows...)
+	}
+	return out, nil
+}
+
+func (r *BenchRunner) runStrategyComparisonPlanCases(
+	ctx context.Context,
+	session *ActiveSession,
+	dataset DatasetID,
+	query *BenchmarkQuery,
+	plan VectorQueryPlan,
+) ([][]string, error) {
 	out := make([][]string, 0, 4)
 	for _, item := range []struct {
 		name     string
@@ -61,16 +95,17 @@ func (r *BenchRunner) runStrategyComparisonCases(
 		{name: "hybrid", strategy: pb.HybridStrategy_HYBRID},
 		{name: "auto", strategy: pb.HybridStrategy_AUTO},
 	} {
-		caseID := fmt.Sprintf("%s-%s-k%d", query.ID, item.name, k)
+		caseID := fmt.Sprintf("%s-%s-%s-k%d", query.ID, plan.Label(), item.name, plan.MaxResults)
 		summary, err := streamMedian(ctx, session, dataset, Experiment1, caseID, func() *pb.GetBrowsingStateRequest {
-			return query.Request(k, item.strategy, false, DefaultBucketConfig())
+			return query.RequestForPlan(plan, item.strategy, false, DefaultBucketConfig())
 		})
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, []string{
+			plan.Label(),
 			FormatFloat(query.ActualSelectivity),
-			fmt.Sprintf("%d", k),
+			fmt.Sprintf("%d", plan.MaxResults),
 			r.opts.DatasetLabel(dataset),
 			r.opts.DatasetSizeLabel(dataset),
 			item.name,

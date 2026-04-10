@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 
+	pb "m3.dataloader/dataloader"
 	qg "m3.dataloader/server/querygen"
 )
 
@@ -64,19 +65,23 @@ func TestComputeFilterHashIncludesRangeBounds(t *testing.T) {
 }
 
 func TestChooseStrategyThresholds(t *testing.T) {
-	if got := chooseStrategy(1, 100, false, 100, false, Auto); got != PostFilter {
+	if got := chooseStrategy(1, 100, false, strategyConfig(100), false, Auto); got != PostFilter {
 		t.Fatalf("no metadata strategy = %v, want PostFilter", got)
 	}
-	if got := chooseStrategy(4999, 10000, true, 100, false, Auto); got != PreFilter {
+	if got := chooseStrategy(4999, 10000, true, strategyConfig(100), false, Auto); got != PreFilter {
 		t.Fatalf("strict filter strategy = %v, want PreFilter", got)
 	}
-	if got := chooseStrategy(5000, 10000, true, 100, false, Auto); got != PostFilter {
+	if got := chooseStrategy(5000, 10000, true, strategyConfig(100), false, Auto); got != PostFilter {
 		t.Fatalf("boundary strategy = %v, want PostFilter", got)
 	}
-	if got := chooseStrategy(2499, 10000, true, 1001, false, Auto); got != PreFilter {
+	if got := chooseStrategy(2499, 10000, true, strategyConfig(1001), false, Auto); got != PreFilter {
 		t.Fatalf("large-k prefilter strategy = %v, want PreFilter", got)
 	}
-	if got := chooseStrategy(2500, 10000, true, 1001, false, Auto); got != Hybrid {
+	if got := chooseStrategy(2500, 10000, true, strategyConfig(1001), false, Auto); got != Hybrid {
 		t.Fatalf("large-k boundary strategy = %v, want Hybrid", got)
 	}
+}
+
+func strategyConfig(maxResults int32) *pb.VectorSearchDimension {
+	return &pb.VectorSearchDimension{MaxResults: maxResults}
 }

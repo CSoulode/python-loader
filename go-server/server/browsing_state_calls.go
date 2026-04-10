@@ -526,7 +526,7 @@ func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesIncrementalGrouping(
 		return fmt.Errorf("invalid axis filter order")
 	}
 	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
-	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
+	bucketInfos := newBucketInfoAttacherForPlan(plan)
 
 	// ---------- Axis positions (needed to map ids -> positions) ----------
 	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "DistinctBranchesIncrementalGrouping(initAxes).exec"); err != nil {
@@ -713,7 +713,7 @@ func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesFull(
 		return fmt.Errorf("invalid axis filter order")
 	}
 	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
-	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
+	bucketInfos := newBucketInfoAttacherForPlan(plan)
 
 	// ---------- Axis positions ----------
 	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "DistinctBranchesFull(initAxes).exec"); err != nil {
@@ -942,7 +942,7 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesSingles(
 		return fmt.Errorf("invalid axis filter order")
 	}
 	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
-	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
+	bucketInfos := newBucketInfoAttacherForPlan(plan)
 
 	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "NonDistinctBranchesSingles(initAxes).exec"); err != nil {
 		return err
@@ -1105,7 +1105,7 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesDeduplicatedSingle
 		return fmt.Errorf("invalid axis filter order")
 	}
 	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
-	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
+	bucketInfos := newBucketInfoAttacherForPlan(plan)
 
 	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "NonDistinctBranchesDedupSingles(initAxes).exec"); err != nil {
 		return err
@@ -1341,7 +1341,7 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesFull(
 		return fmt.Errorf("invalid axis filter order")
 	}
 	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
-	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
+	bucketInfos := newBucketInfoAttacherForPlan(plan)
 
 	// ---------- Axis positions ----------
 	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "NonDistinctBranchesFull(initAxes).exec"); err != nil {
@@ -1573,7 +1573,7 @@ func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesIncrementalGroupin
 		return fmt.Errorf("invalid axis filter order")
 	}
 	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
-	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
+	bucketInfos := newBucketInfoAttacherForPlan(plan)
 
 	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "NonDistinctBranchesIncrementalGrouping(initAxes).exec"); err != nil {
 		return err
@@ -1760,7 +1760,7 @@ func (s *DataLoaderServer) GetBrowsingState(req *pb.GetBrowsingStateRequest, str
 		return fmt.Errorf("invalid axis filter order")
 	}
 	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
-	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
+	bucketInfos := newBucketInfoAttacherForPlan(plan)
 
 	// Flags for “all” and “timeline”
 	allDefined := req.All != ""
@@ -1886,7 +1886,7 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 		return fmt.Errorf("invalid axis filter order")
 	}
 	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
-	bucketInfos := newBucketInfoAttacher(plan.BucketInfos)
+	bucketInfos := newBucketInfoAttacherForPlan(plan)
 
 	// ---------- Instrumentation Init ----------
 	// Captures everything from here (sender plumbing, tx begin, query, scan, send).

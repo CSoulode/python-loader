@@ -32,59 +32,44 @@ const phaseATestDatabaseEnv = "PHASE_A_TEST_DATABASE_URL"
 
 type fakeVectorKVServer struct {
 	kvstorev1.UnimplementedVectorKVServer
-	getCalls         int32
-	knnCalls         int32
-	filteredKNNCalls int32
-	listModelsCalls  int32
-	annIndex         string
-	iterativeScan    bool
+	getCalls           int32
+	knnCalls           int32
+	filteredKNNCalls   int32
+	rangeSearchCalls   int32
+	filteredRangeCalls int32
+	listModelsCalls    int32
+	annIndex           string
+	iterativeScan      bool
 }
 
 func (s *fakeVectorKVServer) Get(_ context.Context, req *kvstorev1.GetRequest) (*kvstorev1.GetResponse, error) {
 	atomic.AddInt32(&s.getCalls, 1)
-	if req.GetModel() != "siglip2" {
-		return nil, fmt.Errorf("unexpected model %q", req.GetModel())
-	}
-	if req.GetId() != 1 {
-		return nil, fmt.Errorf("unexpected object id %d", req.GetId())
+	values, err := fakeVectorForObject(req.GetModel(), req.GetId())
+	if err != nil {
+		return nil, err
 	}
 	return &kvstorev1.GetResponse{
-		Vector: &kvstorev1.Vector{Values: []float32{1, 0, 0}},
+		Vector: &kvstorev1.Vector{Values: values},
 	}, nil
 }
 
 func (s *fakeVectorKVServer) KNN(_ context.Context, req *kvstorev1.KNNRequest) (*kvstorev1.KNNResponse, error) {
 	atomic.AddInt32(&s.knnCalls, 1)
-	if req.GetModel() != "siglip2" {
-		return nil, fmt.Errorf("unexpected model %q", req.GetModel())
-	}
 	if req.GetK() <= 0 {
 		return nil, fmt.Errorf("unexpected k %d", req.GetK())
 	}
 
-	all := []*kvstorev1.Neighbor{
-		{Id: 1, Distance: 0},
-		{Id: 2, Distance: 0.25},
-		{Id: 3, Distance: 0.75},
+	neighbors, err := fakeVectorNeighbors(req.GetModel(), req.GetQuery().GetValues())
+	if err != nil {
+		return nil, err
 	}
-	filtered := make([]*kvstorev1.Neighbor, 0, len(all))
-	for _, neighbor := range all {
-		if req.GetMaxDistance() > 0 && neighbor.GetDistance() > req.GetMaxDistance() {
-			continue
-		}
-		filtered = append(filtered, neighbor)
-		if int32(len(filtered)) == req.GetK() {
-			break
-		}
-	}
-	return &kvstorev1.KNNResponse{Neighbors: filtered}, nil
+	return &kvstorev1.KNNResponse{
+		Neighbors: limitFakeNeighbors(neighbors, req.GetK(), req.GetMaxDistance()),
+	}, nil
 }
 
 func (s *fakeVectorKVServer) FilteredKNN(_ context.Context, req *kvstorev1.FilteredKNNRequest) (*kvstorev1.KNNResponse, error) {
 	atomic.AddInt32(&s.filteredKNNCalls, 1)
-	if req.GetModel() != "siglip2" {
-		return nil, fmt.Errorf("unexpected model %q", req.GetModel())
-	}
 	if req.GetK() <= 0 {
 		return nil, fmt.Errorf("unexpected k %d", req.GetK())
 	}
@@ -93,10 +78,10 @@ func (s *fakeVectorKVServer) FilteredKNN(_ context.Context, req *kvstorev1.Filte
 	for _, candidateID := range req.GetCandidateIds() {
 		allowed[candidateID] = struct{}{}
 	}
-	all := []*kvstorev1.Neighbor{
-		{Id: 1, Distance: 0},
-		{Id: 2, Distance: 0.25},
-		{Id: 3, Distance: 0.75},
+
+	all, err := fakeVectorNeighbors(req.GetModel(), req.GetQuery().GetValues())
+	if err != nil {
+		return nil, err
 	}
 	filtered := make([]*kvstorev1.Neighbor, 0, len(all))
 	for _, neighbor := range all {
@@ -114,6 +99,50 @@ func (s *fakeVectorKVServer) FilteredKNN(_ context.Context, req *kvstorev1.Filte
 	return &kvstorev1.KNNResponse{Neighbors: filtered}, nil
 }
 
+func (s *fakeVectorKVServer) RangeSearch(_ context.Context, req *kvstorev1.RangeSearchRequest) (*kvstorev1.KNNResponse, error) {
+	atomic.AddInt32(&s.rangeSearchCalls, 1)
+	all, err := fakeVectorNeighbors(req.GetModel(), req.GetQuery().GetValues())
+	if err != nil {
+		return nil, err
+	}
+	filtered := filterFakeNeighborsByDistance(all, req.GetMinDistance(), req.GetMaxDistance(), req.GetMaxResults())
+	if len(filtered) == 0 {
+		return &kvstorev1.KNNResponse{}, nil
+	}
+	return &kvstorev1.KNNResponse{Neighbors: filtered}, nil
+}
+
+func (s *fakeVectorKVServer) FilteredRangeSearch(_ context.Context, req *kvstorev1.FilteredRangeSearchRequest) (*kvstorev1.KNNResponse, error) {
+	atomic.AddInt32(&s.filteredRangeCalls, 1)
+
+	allowed := make(map[int32]struct{}, len(req.GetCandidateIds()))
+	for _, candidateID := range req.GetCandidateIds() {
+		allowed[candidateID] = struct{}{}
+	}
+
+	all, err := fakeVectorNeighbors(req.GetModel(), req.GetQuery().GetValues())
+	if err != nil {
+		return nil, err
+	}
+	filtered := make([]*kvstorev1.Neighbor, 0, len(all))
+	for _, neighbor := range all {
+		if _, ok := allowed[neighbor.GetId()]; !ok {
+			continue
+		}
+		if neighbor.GetDistance() < req.GetMinDistance() || neighbor.GetDistance() > req.GetMaxDistance() {
+			continue
+		}
+		filtered = append(filtered, neighbor)
+		if req.GetMaxResults() > 0 && int32(len(filtered)) == req.GetMaxResults() {
+			break
+		}
+	}
+	if len(filtered) == 0 {
+		return nil, status.Error(codes.NotFound, "not found")
+	}
+	return &kvstorev1.KNNResponse{Neighbors: filtered}, nil
+}
+
 func (s *fakeVectorKVServer) ListModels(_ context.Context, _ *kvstorev1.ListModelsRequest) (*kvstorev1.ListModelsResponse, error) {
 	atomic.AddInt32(&s.listModelsCalls, 1)
 	annIndex := s.annIndex
@@ -122,15 +151,135 @@ func (s *fakeVectorKVServer) ListModels(_ context.Context, _ *kvstorev1.ListMode
 	}
 	return &kvstorev1.ListModelsResponse{
 		DefaultModel: "siglip2",
-		Models: []*kvstorev1.ModelInfo{{
-			Name:                   "siglip2",
-			Dim:                    3,
-			TagsetName:             "SigLIP2",
-			DistanceMetric:         "cosine",
-			AnnIndex:               annIndex,
-			IterativeScanAvailable: s.iterativeScan,
-		}},
+		Models: []*kvstorev1.ModelInfo{
+			{
+				Name:                   "siglip2",
+				Dim:                    3,
+				TagsetName:             "SigLIP2",
+				DistanceMetric:         "cosine",
+				AnnIndex:               annIndex,
+				IterativeScanAvailable: s.iterativeScan,
+			},
+			{
+				Name:                   "hsv",
+				Dim:                    3,
+				TagsetName:             "HSV-Histogram",
+				DistanceMetric:         "l2",
+				AnnIndex:               annIndex,
+				IterativeScanAvailable: s.iterativeScan,
+			},
+		},
 	}, nil
+}
+
+func fakeVectorForObject(model string, objectID int32) ([]float32, error) {
+	switch strings.TrimSpace(model) {
+	case "siglip2":
+		switch objectID {
+		case 1:
+			return []float32{1, 0, 0}, nil
+		case 2:
+			return []float32{0, 1, 0}, nil
+		}
+	case "hsv":
+		switch objectID {
+		case 1:
+			return []float32{0, 0, 1}, nil
+		case 2:
+			return []float32{0, 1, 1}, nil
+		}
+	}
+	return nil, fmt.Errorf("unexpected model/reference %q/%d", model, objectID)
+}
+
+func fakeVectorNeighbors(model string, query []float32) ([]*kvstorev1.Neighbor, error) {
+	switch strings.TrimSpace(model) {
+	case "siglip2":
+		switch {
+		case matchesFakeVectorQuery(query, []float32{1, 0, 0}):
+			return cloneFakeNeighbors([]*kvstorev1.Neighbor{
+				{Id: 1, Distance: 0},
+				{Id: 2, Distance: 0.25},
+				{Id: 3, Distance: 0.75},
+			}), nil
+		case matchesFakeVectorQuery(query, []float32{0, 1, 0}):
+			return cloneFakeNeighbors([]*kvstorev1.Neighbor{
+				{Id: 2, Distance: 0},
+				{Id: 3, Distance: 0.1},
+				{Id: 1, Distance: 0.9},
+			}), nil
+		}
+	case "hsv":
+		switch {
+		case matchesFakeVectorQuery(query, []float32{0, 0, 1}):
+			return cloneFakeNeighbors([]*kvstorev1.Neighbor{
+				{Id: 1, Distance: 0},
+				{Id: 3, Distance: 0.1},
+				{Id: 2, Distance: 0.6},
+			}), nil
+		case matchesFakeVectorQuery(query, []float32{0, 1, 1}):
+			return cloneFakeNeighbors([]*kvstorev1.Neighbor{
+				{Id: 2, Distance: 0},
+				{Id: 3, Distance: 0.2},
+				{Id: 1, Distance: 0.7},
+			}), nil
+		}
+	}
+	return nil, fmt.Errorf("unexpected model/query %q/%v", model, query)
+}
+
+func matchesFakeVectorQuery(got []float32, want []float32) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for index, value := range want {
+		if got[index] != value {
+			return false
+		}
+	}
+	return true
+}
+
+func limitFakeNeighbors(
+	neighbors []*kvstorev1.Neighbor,
+	limit int32,
+	maxDistance float32,
+) []*kvstorev1.Neighbor {
+	return filterFakeNeighborsByDistance(neighbors, 0, maxDistance, limit)
+}
+
+func filterFakeNeighborsByDistance(
+	neighbors []*kvstorev1.Neighbor,
+	minDistance float32,
+	maxDistance float32,
+	limit int32,
+) []*kvstorev1.Neighbor {
+	filtered := make([]*kvstorev1.Neighbor, 0, len(neighbors))
+	for _, neighbor := range neighbors {
+		if neighbor.GetDistance() < minDistance {
+			continue
+		}
+		if maxDistance > 0 && neighbor.GetDistance() > maxDistance {
+			continue
+		}
+		filtered = append(filtered, neighbor)
+		if limit > 0 && int32(len(filtered)) == limit {
+			break
+		}
+	}
+	return filtered
+}
+
+func cloneFakeNeighbors(neighbors []*kvstorev1.Neighbor) []*kvstorev1.Neighbor {
+	cloned := make([]*kvstorev1.Neighbor, 0, len(neighbors))
+	for _, neighbor := range neighbors {
+		if neighbor == nil {
+			continue
+		}
+		copyNeighbor := *neighbor
+		cloned = append(cloned, &copyNeighbor)
+	}
+	return cloned
 }
 
 func (s *fakeVectorKVServer) GetCallCount() int32 {
@@ -147,6 +296,14 @@ func (s *fakeVectorKVServer) ListModelsCallCount() int32 {
 
 func (s *fakeVectorKVServer) FilteredKNNCallCount() int32 {
 	return atomic.LoadInt32(&s.filteredKNNCalls)
+}
+
+func (s *fakeVectorKVServer) RangeSearchCallCount() int32 {
+	return atomic.LoadInt32(&s.rangeSearchCalls)
+}
+
+func (s *fakeVectorKVServer) FilteredRangeSearchCallCount() int32 {
+	return atomic.LoadInt32(&s.filteredRangeCalls)
 }
 
 type phaseATestEnv struct {

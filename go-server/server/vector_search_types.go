@@ -1,6 +1,9 @@
 package main
 
-import kvstorev1 "vectorkv/api/kvstore/v1/gen"
+import (
+	pb "m3.dataloader/dataloader"
+	kvstorev1 "vectorkv/api/kvstore/v1/gen"
+)
 
 type SearchKind int
 
@@ -8,6 +11,8 @@ const (
 	searchKindUnknown SearchKind = iota
 	searchKindGlobalKNN
 	searchKindFilteredKNN
+	searchKindGlobalRange
+	searchKindFilteredRange
 	searchKindHybridIntersection
 )
 
@@ -17,6 +22,10 @@ func (k SearchKind) String() string {
 		return "global_knn"
 	case searchKindFilteredKNN:
 		return "filtered_knn"
+	case searchKindGlobalRange:
+		return "global_range"
+	case searchKindFilteredRange:
+		return "filtered_range"
 	case searchKindHybridIntersection:
 		return "hybrid_intersection"
 	default:
@@ -31,6 +40,7 @@ type searchResult struct {
 }
 
 type vectorSearchInputs struct {
+	Config      *pb.VectorSearchDimension
 	ModelInfo   *kvstorev1.ModelInfo
 	QueryVector []float32
 }

@@ -16,6 +16,7 @@ import (
 const (
 	preFilterBaseThreshold          = 5000
 	preFilterIterativeScanThreshold = 20000
+	rangeRingPreFilterThreshold     = 2500
 	postFilterThreshold             = 0.3
 	largeKThreshold                 = 1000
 )
@@ -162,7 +163,7 @@ func chooseStrategy(
 	estimatedFilteredCount int64,
 	totalMediaCount int64,
 	hasMetadataPredicates bool,
-	vectorK int32,
+	cfg *pb.VectorSearchDimension,
 	iterativeScanAvailable bool,
 	forced HybridStrategy,
 ) HybridStrategy {
@@ -173,11 +174,8 @@ func chooseStrategy(
 		return forced
 	}
 
-	threshold := int64(preFilterBaseThreshold)
-	if iterativeScanAvailable {
-		threshold = preFilterIterativeScanThreshold
-	}
-	if vectorK > largeKThreshold {
+	threshold := preFilterThreshold(cfg, iterativeScanAvailable)
+	if effectiveVectorMaxResults(cfg) > largeKThreshold {
 		threshold /= 2
 	}
 	if estimatedFilteredCount < threshold {
@@ -188,6 +186,20 @@ func chooseStrategy(
 		return PostFilter
 	}
 	return Hybrid
+}
+
+func preFilterThreshold(cfg *pb.VectorSearchDimension, iterativeScanAvailable bool) int64 {
+	if isRingRangeQuery(cfg) {
+		return rangeRingPreFilterThreshold
+	}
+	if iterativeScanAvailable {
+		return preFilterIterativeScanThreshold
+	}
+	return preFilterBaseThreshold
+}
+
+func isRingRangeQuery(cfg *pb.VectorSearchDimension) bool {
+	return isRangeQuery(cfg) && cfg.GetDistanceRange().GetMinDistance() > 0
 }
 
 func strategyFromProto(value pb.HybridStrategy) (HybridStrategy, error) {

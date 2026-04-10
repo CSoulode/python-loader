@@ -288,7 +288,13 @@ func TestPhaseCCustomBreaksHTTPCompatAndModelsEndpoint(t *testing.T) {
 	if models.DefaultModel != "siglip2" {
 		t.Fatalf("defaultModel = %q, want siglip2", models.DefaultModel)
 	}
-	if len(models.Models) != 1 || models.Models[0].DistanceMetric != "cosine" {
+	if len(models.Models) != 2 {
+		t.Fatalf("models count = %d, want 2", len(models.Models))
+	}
+	if models.Models[0].Name != "siglip2" || models.Models[0].DistanceMetric != "cosine" {
+		t.Fatalf("first model = %+v", models.Models[0])
+	}
+	if models.Models[1].Name != "hsv" || models.Models[1].DistanceMetric != "l2" {
 		t.Fatalf("models response = %+v", models)
 	}
 }

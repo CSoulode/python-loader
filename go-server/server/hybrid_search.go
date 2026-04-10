@@ -43,8 +43,30 @@ func (s *DataLoaderServer) executeHybridSearch(
 		candidateIDs = ids
 		return nil
 	})
-
 	if err := group.Wait(); err != nil {
+		return searchResult{}, err
+	}
+	result := intersectHybridNeighbors(vectorResult, candidateIDs)
+	logBenchmarkEvent(ctx, "hybrid_intersection_done", map[string]any{
+		"model_name":      strings.TrimSpace(cfg.GetModelName()),
+		"candidate_count": len(candidateIDs),
+		"input_count":     len(vectorResult.RawNeighbors),
+		"result_count":    len(result.RawNeighbors),
+		"distance_metric": result.DistanceMetric,
+	})
+	return result, nil
+}
+
+func (s *DataLoaderServer) executeHybridSearchWithCandidates(
+	ctx context.Context,
+	cfg *pb.VectorSearchDimension,
+	inputs *vectorSearchInputs,
+	candidateIDs []int32,
+	refHash uint64,
+	filterHash uint64,
+) (searchResult, error) {
+	vectorResult, err := s.globalVectorSearchForHybrid(ctx, cfg, inputs, refHash, filterHash)
+	if err != nil {
 		return searchResult{}, err
 	}
 	result := intersectHybridNeighbors(vectorResult, candidateIDs)
@@ -66,18 +88,22 @@ func (s *DataLoaderServer) globalVectorSearchForHybrid(
 	filterHash uint64,
 ) (searchResult, error) {
 	cache := s.ensureVectorCache()
-	modelName := strings.TrimSpace(cfg.GetModelName())
-	if result, ok := cache.TryGetGlobalKNN(modelName, refHash, filterHash, cfg.GetMaxResults()); ok {
-		logBenchmarkEvent(ctx, "vector_cache_hit", map[string]any{
+	effectiveCfg := cfg
+	if inputs != nil && inputs.Config != nil {
+		effectiveCfg = inputs.Config
+	}
+	modelName := strings.TrimSpace(effectiveCfg.GetModelName())
+	if result, ok := cache.TryGetGlobalForConfig(effectiveCfg, refHash, filterHash); ok {
+		logBenchmarkEvent(ctx, "vector_cache_hit", appendVectorQueryBenchmarkFields(map[string]any{
 			"model_name":  modelName,
 			"filter_hash": filterHash,
 			"ref_hash":    refHash,
-			"req_k":       cfg.GetMaxResults(),
-			"search_kind": searchKindGlobalKNN.String(),
-		})
+			"req_k":       effectiveVectorMaxResults(effectiveCfg),
+			"search_kind": globalSearchKindForConfig(effectiveCfg).String(),
+		}, effectiveCfg))
 		return result, nil
 	}
-	return s.searchNeighbors(ctx, cfg, inputs)
+	return s.searchNeighbors(ctx, effectiveCfg, inputs)
 }
 
 func intersectHybridNeighbors(result searchResult, candidateIDs []int32) searchResult {

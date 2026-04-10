@@ -449,6 +449,7 @@ func main() {
 	httpMux.HandleFunc("/api/node/{id}/children", GetMetaDataCubeCompatNodeChildrenHandler(server.db))
 	httpMux.HandleFunc("/api/node/{id}/Children", GetMetaDataCubeCompatNodeChildrenHandler(server.db))
 	httpMux.HandleFunc("/api/cubeobject/{id}/tags", GetMetaDataCubeCompatCubeObjectTagsHandler(server.db))
+	httpMux.HandleFunc("/api/media/{id}/thumbnail", GetMetaDataCubeCompatMediaThumbnailHandler(server.db))
 	httpMux.HandleFunc("/api/vector/models", GetVectorModelsHandler(server))
 	httpMux.HandleFunc("/api/cell", GetMetaDataCubeCompatCellHandler(server))
 	httpMux.HandleFunc("/api/cell/", GetMetaDataCubeCompatCellHandler(server))

@@ -90,6 +90,10 @@ func (r *BenchRunner) runExperiments(ctx context.Context) error {
 			err = r.RunExperiment6(ctx)
 		case Experiment7:
 			err = r.RunExperiment7(ctx)
+		case Experiment8:
+			err = r.RunExperiment8(ctx)
+		case Experiment9:
+			err = r.RunExperiment9(ctx)
 		default:
 			err = fmt.Errorf("unsupported experiment %s", experiment)
 		}

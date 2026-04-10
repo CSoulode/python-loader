@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"m3.dataloader/benchmark/runner"
 )
@@ -27,7 +28,7 @@ func run() error {
 		return err
 	}
 
-	defaultOutputRoot := filepath.Join(root, "docs", "experiments", "phase_d")
+	defaultOutputRoot := filepath.Join(root, "docs", "experiments", "phase_d4_range_"+time.Now().UTC().Format("2006-01-02"))
 	defaultEnvFile := filepath.Join(root, "python-loader", "go-server", ".env")
 	defaultModelsFile := filepath.Join(root, "vectorkv", "config", "models.json")
 
@@ -40,7 +41,7 @@ func run() error {
 		modelsFile       string
 		keepServices     bool
 	)
-	flag.StringVar(&experimentsValue, "experiments", "", "comma-separated experiment ids: exp1..exp7")
+	flag.StringVar(&experimentsValue, "experiments", "", "comma-separated experiment ids: exp1..exp9")
 	flag.StringVar(&datasetsValue, "datasets", "", "comma-separated dataset labels from --dataset-config (defaults: 182k,725k)")
 	flag.StringVar(&datasetConfig, "dataset-config", "", "comma-separated dataset specs: label:size:dsn_env")
 	flag.StringVar(&outputRoot, "output-root", defaultOutputRoot, "output root for raw/ figures/ analysis/")

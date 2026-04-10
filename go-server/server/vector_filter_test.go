@@ -16,23 +16,31 @@ import (
 )
 
 type stubVectorSearchClient struct {
-	getResp         *kvstorev1.GetResponse
-	getErr          error
-	knnResp         *kvstorev1.KNNResponse
-	knnErr          error
-	filteredKNNResp *kvstorev1.KNNResponse
-	filteredKNNErr  error
-	listModelsResp  *kvstorev1.ListModelsResponse
-	listModelsErr   error
+	getResp           *kvstorev1.GetResponse
+	getErr            error
+	knnResp           *kvstorev1.KNNResponse
+	knnErr            error
+	filteredKNNResp   *kvstorev1.KNNResponse
+	filteredKNNErr    error
+	rangeResp         *kvstorev1.KNNResponse
+	rangeErr          error
+	filteredRangeResp *kvstorev1.KNNResponse
+	filteredRangeErr  error
+	listModelsResp    *kvstorev1.ListModelsResponse
+	listModelsErr     error
 
-	gotGet         *kvstorev1.GetRequest
-	gotKNN         *kvstorev1.KNNRequest
-	gotFilteredKNN *kvstorev1.FilteredKNNRequest
-	gotListModels  *kvstorev1.ListModelsRequest
-	getCalls       int
-	knnCalls       int
-	filteredCalls  int
-	listCalls      int
+	gotGet             *kvstorev1.GetRequest
+	gotKNN             *kvstorev1.KNNRequest
+	gotFilteredKNN     *kvstorev1.FilteredKNNRequest
+	gotRangeSearch     *kvstorev1.RangeSearchRequest
+	gotFilteredRange   *kvstorev1.FilteredRangeSearchRequest
+	gotListModels      *kvstorev1.ListModelsRequest
+	getCalls           int
+	knnCalls           int
+	filteredCalls      int
+	rangeCalls         int
+	filteredRangeCalls int
+	listCalls          int
 }
 
 func (s *stubVectorSearchClient) Get(_ context.Context, req *kvstorev1.GetRequest, _ ...grpc.CallOption) (*kvstorev1.GetResponse, error) {
@@ -51,6 +59,18 @@ func (s *stubVectorSearchClient) FilteredKNN(_ context.Context, req *kvstorev1.F
 	s.gotFilteredKNN = req
 	s.filteredCalls++
 	return s.filteredKNNResp, s.filteredKNNErr
+}
+
+func (s *stubVectorSearchClient) RangeSearch(_ context.Context, req *kvstorev1.RangeSearchRequest, _ ...grpc.CallOption) (*kvstorev1.KNNResponse, error) {
+	s.gotRangeSearch = req
+	s.rangeCalls++
+	return s.rangeResp, s.rangeErr
+}
+
+func (s *stubVectorSearchClient) FilteredRangeSearch(_ context.Context, req *kvstorev1.FilteredRangeSearchRequest, _ ...grpc.CallOption) (*kvstorev1.KNNResponse, error) {
+	s.gotFilteredRange = req
+	s.filteredRangeCalls++
+	return s.filteredRangeResp, s.filteredRangeErr
 }
 
 func (s *stubVectorSearchClient) ListModels(_ context.Context, req *kvstorev1.ListModelsRequest, _ ...grpc.CallOption) (*kvstorev1.ListModelsResponse, error) {

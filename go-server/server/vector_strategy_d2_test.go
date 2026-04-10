@@ -11,23 +11,33 @@ import (
 )
 
 func TestChooseStrategySelectsHybridInMiddleBand(t *testing.T) {
-	got := chooseStrategy(5000, 20000, true, 100, false, Auto)
+	got := chooseStrategy(5000, 20000, true, strategyTestConfig(100, nil), false, Auto)
 	if got != Hybrid {
 		t.Fatalf("strategy = %v, want Hybrid", got)
 	}
 }
 
 func TestChooseStrategyUsesIterativeScanThreshold(t *testing.T) {
-	got := chooseStrategy(15000, 50000, true, 100, true, Auto)
+	got := chooseStrategy(15000, 50000, true, strategyTestConfig(100, nil), true, Auto)
 	if got != PreFilter {
 		t.Fatalf("strategy = %v, want PreFilter", got)
 	}
 }
 
 func TestChooseStrategyHonorsForcedOverride(t *testing.T) {
-	got := chooseStrategy(25000, 50000, true, 100, false, PreFilter)
+	got := chooseStrategy(25000, 50000, true, strategyTestConfig(100, nil), false, PreFilter)
 	if got != PreFilter {
 		t.Fatalf("strategy = %v, want forced PreFilter", got)
+	}
+}
+
+func TestChooseStrategyUsesStricterRingThreshold(t *testing.T) {
+	got := chooseStrategy(3000, 50000, true, strategyTestConfig(100, &pb.DistanceRange{
+		MinDistance: 0.2,
+		MaxDistance: 0.7,
+	}), true, Auto)
+	if got != Hybrid {
+		t.Fatalf("strategy = %v, want Hybrid for ring range", got)
 	}
 }
 
@@ -79,5 +89,13 @@ func TestParseBrowsingStateRequestRejectsHybridStrategyWithoutVectorDimension(t 
 	})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("error code = %s, want InvalidArgument", status.Code(err))
+	}
+}
+
+func strategyTestConfig(maxResults int32, distanceRange *pb.DistanceRange) *pb.VectorSearchDimension {
+	return &pb.VectorSearchDimension{
+		ModelName:     "siglip2",
+		MaxResults:    maxResults,
+		DistanceRange: distanceRange,
 	}
 }

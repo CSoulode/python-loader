@@ -40,24 +40,28 @@ func (s *DataLoaderServer) resolveVectorDimensionForMetadata(
 	}
 
 	cache := s.ensureVectorCache()
-	modelName := strings.TrimSpace(cfg.GetModelName())
 	if rebucketOnly {
-		result, ok := cache.TryGet(modelName, refHash, filterHash, cfg.GetMaxResults())
-		if !ok {
-			return nil, status.Error(codes.FailedPrecondition, "rebucket_only: no cached search results for this model+reference+filters; re-send without rebucket_only to trigger a new search")
-		}
-		logBenchmarkEvent(ctx, "vector_cache_hit", map[string]any{
-			"model_name":  modelName,
-			"filter_hash": filterHash,
-			"ref_hash":    refHash,
-			"req_k":       cfg.GetMaxResults(),
-		})
-		bucketStart := time.Now()
-		bucketed, err := bucketSearchResult(cfg, result)
+		effectiveCfg, err := s.resolveVectorCacheLookupConfig(ctx, cfg)
 		if err != nil {
 			return nil, err
 		}
-		logBenchmarkEvent(ctx, "bucketing_done", map[string]any{
+		modelName := strings.TrimSpace(effectiveCfg.GetModelName())
+		result, ok := cache.TryGetForConfig(effectiveCfg, refHash, filterHash)
+		if !ok {
+			return nil, status.Error(codes.FailedPrecondition, "rebucket_only: no cached search results for this model+reference+filters; re-send without rebucket_only to trigger a new search")
+		}
+		logBenchmarkEvent(ctx, "vector_cache_hit", appendVectorQueryBenchmarkFields(map[string]any{
+			"model_name":  modelName,
+			"filter_hash": filterHash,
+			"ref_hash":    refHash,
+			"req_k":       effectiveVectorMaxResults(effectiveCfg),
+		}, effectiveCfg))
+		bucketStart := time.Now()
+		bucketed, err := bucketSearchResult(effectiveCfg, result)
+		if err != nil {
+			return nil, err
+		}
+		logBenchmarkEvent(ctx, "bucketing_done", appendVectorQueryBenchmarkFields(map[string]any{
 			"model_name":    modelName,
 			"bucket_count":  len(bucketed.BucketInfos),
 			"result_count":  len(result.RawNeighbors),
@@ -65,23 +69,28 @@ func (s *DataLoaderServer) resolveVectorDimensionForMetadata(
 			"search_kind":   result.Kind.String(),
 			"cache_hit":     true,
 			"rebucket_only": true,
-		})
+		}, effectiveCfg))
 		return bucketed, nil
 	}
-	logBenchmarkEvent(ctx, "vector_cache_miss", map[string]any{
-		"model_name":  modelName,
-		"filter_hash": filterHash,
-		"ref_hash":    refHash,
-		"req_k":       cfg.GetMaxResults(),
-	})
 
 	inputs, err := s.resolveVectorSearchInputs(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
+	effectiveCfg := cfg
+	if inputs.Config != nil {
+		effectiveCfg = inputs.Config
+	}
+	modelName := strings.TrimSpace(effectiveCfg.GetModelName())
+	logBenchmarkEvent(ctx, "vector_cache_miss", appendVectorQueryBenchmarkFields(map[string]any{
+		"model_name":  modelName,
+		"filter_hash": filterHash,
+		"ref_hash":    refHash,
+		"req_k":       effectiveVectorMaxResults(effectiveCfg),
+	}, effectiveCfg))
 	result, err := s.executeVectorSearchWithStrategy(
 		ctx,
-		cfg,
+		effectiveCfg,
 		inputs,
 		metadataFilters,
 		metadataAxes,
@@ -92,13 +101,13 @@ func (s *DataLoaderServer) resolveVectorDimensionForMetadata(
 	if err != nil {
 		return nil, err
 	}
-	cache.Put(modelName, refHash, filterHash, result, cfg.GetMaxResults())
+	cache.PutForConfig(effectiveCfg, refHash, filterHash, result)
 	bucketStart := time.Now()
-	bucketed, err := bucketSearchResult(cfg, result)
+	bucketed, err := bucketSearchResult(effectiveCfg, result)
 	if err != nil {
 		return nil, err
 	}
-	logBenchmarkEvent(ctx, "bucketing_done", map[string]any{
+	logBenchmarkEvent(ctx, "bucketing_done", appendVectorQueryBenchmarkFields(map[string]any{
 		"model_name":    modelName,
 		"bucket_count":  len(bucketed.BucketInfos),
 		"result_count":  len(result.RawNeighbors),
@@ -106,15 +115,15 @@ func (s *DataLoaderServer) resolveVectorDimensionForMetadata(
 		"search_kind":   result.Kind.String(),
 		"cache_hit":     false,
 		"rebucket_only": false,
-	})
-	logBenchmarkEvent(ctx, "vector_cache_put", map[string]any{
+	}, effectiveCfg))
+	logBenchmarkEvent(ctx, "vector_cache_put", appendVectorQueryBenchmarkFields(map[string]any{
 		"model_name":   modelName,
 		"filter_hash":  filterHash,
 		"ref_hash":     refHash,
-		"req_k":        cfg.GetMaxResults(),
+		"req_k":        effectiveVectorMaxResults(effectiveCfg),
 		"search_kind":  result.Kind.String(),
 		"result_count": len(result.RawNeighbors),
-	})
+	}, effectiveCfg))
 	return bucketed, nil
 }
 
@@ -130,10 +139,10 @@ func (s *DataLoaderServer) executeVectorSearchWithStrategy(
 ) (searchResult, error) {
 	strategy, err := s.determineVectorStrategy(
 		ctx,
+		cfg,
 		inputs.ModelInfo,
 		metadataFilters,
 		metadataAxes,
-		cfg.GetMaxResults(),
 		forcedStrategy,
 	)
 	if err != nil {
@@ -156,20 +165,20 @@ func (s *DataLoaderServer) executeVectorSearchWithStrategy(
 
 func (s *DataLoaderServer) determineVectorStrategy(
 	ctx context.Context,
+	cfg *pb.VectorSearchDimension,
 	modelInfo *kvstorev1.ModelInfo,
 	metadataFilters []qg.ParsedFilter,
 	metadataAxes []qg.ParsedAxis,
-	vectorK int32,
 	forcedStrategy HybridStrategy,
 ) (HybridStrategy, error) {
 	if !hasMetadataPredicates(metadataFilters, metadataAxes) {
-		logBenchmarkEvent(ctx, "strategy_selected", map[string]any{
+		logBenchmarkEvent(ctx, "strategy_selected", appendVectorQueryBenchmarkFields(map[string]any{
 			"strategy":                 PostFilter.String(),
 			"forced_strategy":          forcedStrategy.String(),
 			"has_metadata_predicates":  false,
 			"iterative_scan_available": false,
-			"vector_k":                 vectorK,
-		})
+			"vector_k":                 effectiveVectorMaxResults(cfg),
+		}, cfg))
 		return PostFilter, nil
 	}
 	if modelInfo == nil {
@@ -189,21 +198,21 @@ func (s *DataLoaderServer) determineVectorStrategy(
 		estimatedFilteredCount,
 		totalMediaCount,
 		true,
-		vectorK,
+		cfg,
 		modelInfo.GetIterativeScanAvailable(),
 		forcedStrategy,
 	)
-	logBenchmarkEvent(ctx, "strategy_selected", map[string]any{
+	logBenchmarkEvent(ctx, "strategy_selected", appendVectorQueryBenchmarkFields(map[string]any{
 		"strategy":                 strategy.String(),
 		"forced_strategy":          forcedStrategy.String(),
 		"has_metadata_predicates":  true,
 		"iterative_scan_available": modelInfo.GetIterativeScanAvailable(),
 		"estimated_filtered_count": estimatedFilteredCount,
 		"total_media_count":        totalMediaCount,
-		"vector_k":                 vectorK,
+		"vector_k":                 effectiveVectorMaxResults(cfg),
 		"model_name":               modelInfo.GetName(),
 		"ann_index":                modelInfo.GetAnnIndex(),
-	})
+	}, cfg))
 	return strategy, nil
 }
 
@@ -260,42 +269,66 @@ func (s *DataLoaderServer) searchNeighborsInCandidates(
 	if inputs == nil || inputs.ModelInfo == nil {
 		return searchResult{}, status.Error(codes.FailedPrecondition, "vector search inputs are not configured")
 	}
+	effectiveCfg := cfg
+	if inputs.Config != nil {
+		effectiveCfg = inputs.Config
+	}
+	maxResults := effectiveVectorMaxResults(effectiveCfg)
+	searchKind := searchKindFilteredKNN
+	if isRangeQuery(effectiveCfg) {
+		searchKind = searchKindFilteredRange
+	}
 	if len(candidateIDs) == 0 {
-		logBenchmarkEvent(ctx, "vector_search_done", map[string]any{
+		logBenchmarkEvent(ctx, "vector_search_done", appendVectorQueryBenchmarkFields(map[string]any{
 			"model_name":       inputs.ModelInfo.GetName(),
-			"search_kind":      searchKindFilteredKNN.String(),
+			"search_kind":      searchKind.String(),
 			"vector_search_ms": 0.0,
 			"result_count":     0,
 			"candidate_count":  0,
 			"distance_metric":  inputs.ModelInfo.GetDistanceMetric(),
-			"requested_k":      cfg.GetMaxResults(),
-		})
+			"requested_k":      maxResults,
+		}, effectiveCfg))
 		return searchResult{
 			DistanceMetric: inputs.ModelInfo.GetDistanceMetric(),
-			Kind:           searchKindFilteredKNN,
+			Kind:           searchKind,
 		}, nil
 	}
 
 	start := time.Now()
-	resp, err := s.vectorFilters.client.FilteredKNN(ctx, &kvstorev1.FilteredKNNRequest{
-		Query:        &kvstorev1.Vector{Values: inputs.QueryVector},
-		K:            cfg.GetMaxResults(),
-		Model:        strings.TrimSpace(cfg.GetModelName()),
-		CandidateIds: candidateIDs,
-	})
+	var (
+		resp *kvstorev1.KNNResponse
+		err  error
+	)
+	if isRangeQuery(effectiveCfg) {
+		resp, err = s.vectorFilters.client.FilteredRangeSearch(ctx, &kvstorev1.FilteredRangeSearchRequest{
+			Query:        &kvstorev1.Vector{Values: inputs.QueryVector},
+			Model:        strings.TrimSpace(effectiveCfg.GetModelName()),
+			CandidateIds: candidateIDs,
+			MinDistance:  effectiveCfg.GetDistanceRange().GetMinDistance(),
+			MaxDistance:  effectiveCfg.GetDistanceRange().GetMaxDistance(),
+			MaxResults:   maxResults,
+		})
+	} else {
+		resp, err = s.vectorFilters.client.FilteredKNN(ctx, &kvstorev1.FilteredKNNRequest{
+			Query:        &kvstorev1.Vector{Values: inputs.QueryVector},
+			K:            maxResults,
+			Model:        strings.TrimSpace(effectiveCfg.GetModelName()),
+			CandidateIds: candidateIDs,
+		})
+	}
 	if status.Code(err) == codes.NotFound {
-		logBenchmarkEvent(ctx, "vector_search_done", map[string]any{
+		logBenchmarkEvent(ctx, "vector_search_done", appendVectorQueryBenchmarkFields(map[string]any{
 			"model_name":       inputs.ModelInfo.GetName(),
-			"search_kind":      searchKindFilteredKNN.String(),
+			"search_kind":      searchKind.String(),
 			"vector_search_ms": durationMillis(start),
 			"result_count":     0,
 			"candidate_count":  len(candidateIDs),
 			"distance_metric":  inputs.ModelInfo.GetDistanceMetric(),
-			"requested_k":      cfg.GetMaxResults(),
-		})
+			"requested_k":      maxResults,
+		}, effectiveCfg))
 		return searchResult{
 			DistanceMetric: inputs.ModelInfo.GetDistanceMetric(),
-			Kind:           searchKindFilteredKNN,
+			Kind:           searchKind,
 		}, nil
 	}
 	if err != nil {
@@ -304,17 +337,17 @@ func (s *DataLoaderServer) searchNeighborsInCandidates(
 	result := searchResult{
 		RawNeighbors:   neighborsFromProto(resp.GetNeighbors()),
 		DistanceMetric: inputs.ModelInfo.GetDistanceMetric(),
-		Kind:           searchKindFilteredKNN,
+		Kind:           searchKind,
 	}
-	logBenchmarkEvent(ctx, "vector_search_done", map[string]any{
+	logBenchmarkEvent(ctx, "vector_search_done", appendVectorQueryBenchmarkFields(map[string]any{
 		"model_name":       inputs.ModelInfo.GetName(),
 		"search_kind":      result.Kind.String(),
 		"vector_search_ms": durationMillis(start),
 		"result_count":     len(result.RawNeighbors),
 		"candidate_count":  len(candidateIDs),
 		"distance_metric":  inputs.ModelInfo.GetDistanceMetric(),
-		"requested_k":      cfg.GetMaxResults(),
-	})
+		"requested_k":      maxResults,
+	}, effectiveCfg))
 	return result, nil
 }
 
@@ -322,22 +355,59 @@ func (s *DataLoaderServer) resolveVectorSearchInputs(
 	ctx context.Context,
 	cfg *pb.VectorSearchDimension,
 ) (*vectorSearchInputs, error) {
-	modelInfo, err := s.resolveModelInfo(ctx, cfg.GetModelName())
+	normalizedCfg, modelInfo, err := s.resolveNormalizedVectorSearchConfig(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 	queryVector, err := s.vectorFilters.resolveQueryVector(ctx, &pb.VectorFilterConfig{
-		ModelName: cfg.GetModelName(),
-		Reference: cfg.GetReference(),
-		K:         cfg.GetMaxResults(),
+		ModelName: normalizedCfg.GetModelName(),
+		Reference: normalizedCfg.GetReference(),
+		K:         effectiveVectorMaxResults(normalizedCfg),
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &vectorSearchInputs{
+		Config:      normalizedCfg,
 		ModelInfo:   modelInfo,
 		QueryVector: queryVector,
 	}, nil
+}
+
+func (s *DataLoaderServer) resolveNormalizedVectorSearchConfig(
+	ctx context.Context,
+	cfg *pb.VectorSearchDimension,
+) (*pb.VectorSearchDimension, *kvstorev1.ModelInfo, error) {
+	modelInfo, err := s.resolveModelInfo(ctx, cfg.GetModelName())
+	if err != nil {
+		return nil, nil, err
+	}
+	normalizedCfg, err := normalizeVectorSearchConfig(cfg, modelInfo.GetDistanceMetric())
+	if err != nil {
+		return nil, nil, err
+	}
+	return normalizedCfg, modelInfo, nil
+}
+
+func (s *DataLoaderServer) resolveVectorCacheLookupConfig(
+	ctx context.Context,
+	cfg *pb.VectorSearchDimension,
+) (*pb.VectorSearchDimension, error) {
+	if cfg == nil {
+		return nil, nil
+	}
+
+	if !isRangeQuery(cfg) || cfg.GetRangeSemantics() == pb.RangeSemantics_DISTANCE {
+		cloned := cloneVectorSearchConfig(cfg)
+		cloned.MaxResults = effectiveVectorMaxResults(cfg)
+		return cloned, nil
+	}
+
+	normalizedCfg, _, err := s.resolveNormalizedVectorSearchConfig(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return normalizedCfg, nil
 }
 
 func metadataAxesFromPlan(plan *browsingStateRequestPlan) []qg.ParsedAxis {

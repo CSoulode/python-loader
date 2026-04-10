@@ -10,7 +10,7 @@ import (
 )
 
 func (r *BenchRunner) RunExperiment5(ctx context.Context) error {
-	rows := make([][]string, 0, len(r.opts.Datasets)*len(r.catalog.Models)*len(fullSelectivities)*len(defaultKValues)*4)
+	rows := make([][]string, 0, len(r.opts.Datasets)*len(r.catalog.Models)*len(fullSelectivities)*len(defaultKValues)*12)
 	specs := []benchindex.Spec{
 		{Type: benchindex.HNSW, Precision: benchindex.FullPrecision, IterativeMode: benchindex.IterativeOff},
 		{Type: benchindex.IVFFlat, Precision: benchindex.FullPrecision, IterativeMode: benchindex.IterativeOff},
@@ -34,7 +34,7 @@ func (r *BenchRunner) RunExperiment5(ctx context.Context) error {
 	}
 	return WriteCSV(
 		filepath.Join(r.paths.RawDir, "exp5_index_comparison.csv"),
-		[]string{"dataset_label", "dataset_size", "model", "index_type", "k", "selectivity", "ttfb_ms", "ttlb_ms", "recall_at_k", "index_size_mb"},
+		[]string{"dataset_label", "dataset_size", "model", "index_type", "query_mode", "k", "selectivity", "ttfb_ms", "ttlb_ms", "recall_at_k", "index_size_mb"},
 		rows,
 	)
 }
@@ -66,11 +66,17 @@ func (r *BenchRunner) runIndexComparisonCases(
 				}
 			}
 			for _, k := range defaultKValues {
-				row, err := r.runSingleIndexComparison(ctx, session, dataset, spec, rebuild[model.Name], query, vector, candidateIDs, k)
+				plans, err := BuildVectorPlans(ctx, session.DB, query, vector, candidateIDs, k)
 				if err != nil {
 					return nil, err
 				}
-				rows = append(rows, row)
+				for _, plan := range plans {
+					row, err := r.runSingleIndexComparison(ctx, session, dataset, spec, rebuild[model.Name], query, vector, candidateIDs, plan)
+					if err != nil {
+						return nil, err
+					}
+					rows = append(rows, row)
+				}
 			}
 		}
 	}
@@ -86,17 +92,17 @@ func (r *BenchRunner) runSingleIndexComparison(
 	query *BenchmarkQuery,
 	vector []float32,
 	candidateIDs []int32,
-	k int32,
+	plan VectorQueryPlan,
 ) ([]string, error) {
-	plan := strategyForSelectivity(query.ActualSelectivity)
-	summary, err := streamMedian(ctx, session, dataset, Experiment5, fmt.Sprintf("%s-%s-k%d", query.ID, spec.Type, k), func() *pb.GetBrowsingStateRequest {
-		return query.Request(k, plan.Enum, false, DefaultBucketConfig())
+	strategyPlan := strategyForSelectivity(query.ActualSelectivity)
+	summary, err := streamMedian(ctx, session, dataset, Experiment5, fmt.Sprintf("%s-%s-%s-k%d", query.ID, spec.Type, plan.Label(), plan.MaxResults), func() *pb.GetBrowsingStateRequest {
+		return query.RequestForPlan(plan, strategyPlan.Enum, false, DefaultBucketConfig())
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	approx, recall, err := runRecallCase(ctx, session, query, vector, candidateIDs, k)
+	approx, recall, err := runVectorPlanRecallCase(ctx, session, query, vector, candidateIDs, plan)
 	if err != nil {
 		return nil, err
 	}
@@ -111,53 +117,12 @@ func (r *BenchRunner) runSingleIndexComparison(
 		r.opts.DatasetSizeLabel(dataset),
 		query.Model.Name,
 		string(spec.Type),
-		fmt.Sprintf("%d", k),
+		plan.Label(),
+		fmt.Sprintf("%d", plan.MaxResults),
 		FormatFloat(query.ActualSelectivity),
 		FormatFloat(summary.TTFB),
 		FormatFloat(summary.TTLB),
 		FormatFloat(recall),
 		FormatFloat(indexSize),
 	}, nil
-}
-
-func runRecallCase(
-	ctx context.Context,
-	session *ActiveSession,
-	query *BenchmarkQuery,
-	vector []float32,
-	candidateIDs []int32,
-	k int32,
-) ([]Neighbor, float64, error) {
-	var (
-		approx []Neighbor
-		exact  []Neighbor
-		err    error
-	)
-	if len(candidateIDs) == 0 && query.TargetSelectivity >= 1.0 {
-		approx, _, err = measureSearchMedian(ctx, func(runCtx context.Context) ([]Neighbor, error) {
-			return SearchKNN(runCtx, session.VectorClient, query.Model.Name, vector, k)
-		})
-		if err != nil {
-			return nil, 0, err
-		}
-		exact, err = ExactKNN(ctx, session.DB, query.Model, vector, int(k))
-		if err != nil {
-			return nil, 0, err
-		}
-		return approx, RecallAtK(approx, exact, int(k)), nil
-	}
-	if len(candidateIDs) == 0 {
-		return nil, 0, nil
-	}
-	approx, _, err = measureSearchMedian(ctx, func(runCtx context.Context) ([]Neighbor, error) {
-		return SearchFilteredKNN(runCtx, session.VectorClient, query.Model.Name, vector, k, candidateIDs)
-	})
-	if err != nil {
-		return nil, 0, err
-	}
-	exact, err = ExactFilteredKNN(ctx, session.DB, query.Model, vector, candidateIDs, int(k))
-	if err != nil {
-		return nil, 0, err
-	}
-	return approx, RecallAtK(approx, exact, int(k)), nil
 }

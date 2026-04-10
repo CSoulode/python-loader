@@ -34,11 +34,24 @@ func validateVectorDimensionConfig(cfg *pb.VectorSearchDimension) error {
 	if err := validateVectorReference(cfg.GetReference(), "vector_dimension.reference"); err != nil {
 		return err
 	}
-	if cfg.GetMaxResults() <= 0 {
+	if isRangeQuery(cfg) {
+		if cfg.GetMaxResults() < 0 {
+			return status.Error(codes.InvalidArgument, "vector_dimension.max_results must be >= 0 in range mode")
+		}
+	} else if cfg.GetMaxResults() <= 0 {
 		return status.Error(codes.InvalidArgument, "vector_dimension.max_results must be > 0")
 	}
 	if err := validateVectorBucketConfig(cfg.GetBucketCfg()); err != nil {
 		return err
+	}
+	if isRangeQuery(cfg) && cfg.GetBucketCfg().GetStrategy() == pb.BucketStrategy_CUSTOM {
+		if err := validateCustomBreaks(
+			cfg.GetBucketCfg().GetCustomBreaks(),
+			cfg.GetDistanceRange().GetMinDistance(),
+			cfg.GetDistanceRange().GetMaxDistance(),
+		); err != nil {
+			return err
+		}
 	}
 
 	switch cfg.GetAxis() {
@@ -148,7 +161,7 @@ func (s *DataLoaderServer) handleVectorDimension(
 	if err != nil {
 		return nil, err
 	}
-	return bucketSearchResult(cfg, result)
+	return bucketSearchResult(inputs.Config, result)
 }
 
 func (s *DataLoaderServer) resolveVectorDimensionWithCache(
@@ -167,12 +180,59 @@ func (s *DataLoaderServer) searchNeighbors(
 	if inputs == nil || inputs.ModelInfo == nil {
 		return searchResult{}, status.Error(codes.FailedPrecondition, "vector search inputs are not configured")
 	}
+	effectiveCfg := cfg
+	if inputs.Config != nil {
+		effectiveCfg = inputs.Config
+	}
+	maxResults := effectiveVectorMaxResults(effectiveCfg)
 
 	start := time.Now()
+	if isRangeQuery(effectiveCfg) {
+		resp, err := s.vectorFilters.client.RangeSearch(ctx, &kvstorev1.RangeSearchRequest{
+			Query:       &kvstorev1.Vector{Values: inputs.QueryVector},
+			Model:       strings.TrimSpace(effectiveCfg.GetModelName()),
+			MinDistance: effectiveCfg.GetDistanceRange().GetMinDistance(),
+			MaxDistance: effectiveCfg.GetDistanceRange().GetMaxDistance(),
+			MaxResults:  maxResults,
+		})
+		if err != nil {
+			if isEmptyRangeSearchError(err) {
+				result := emptySearchResult(inputs.ModelInfo.GetDistanceMetric(), searchKindGlobalRange)
+				logBenchmarkEvent(ctx, "vector_search_done", appendVectorQueryBenchmarkFields(map[string]any{
+					"model_name":       inputs.ModelInfo.GetName(),
+					"search_kind":      result.Kind.String(),
+					"vector_search_ms": durationMillis(start),
+					"result_count":     0,
+					"candidate_count":  0,
+					"distance_metric":  inputs.ModelInfo.GetDistanceMetric(),
+					"requested_k":      maxResults,
+				}, effectiveCfg))
+				return result, nil
+			}
+			return searchResult{}, wrapVectorKVError("vector_dimension range search", err)
+		}
+
+		result := searchResult{
+			RawNeighbors:   neighborsFromProto(resp.GetNeighbors()),
+			DistanceMetric: inputs.ModelInfo.GetDistanceMetric(),
+			Kind:           searchKindGlobalRange,
+		}
+		logBenchmarkEvent(ctx, "vector_search_done", appendVectorQueryBenchmarkFields(map[string]any{
+			"model_name":       inputs.ModelInfo.GetName(),
+			"search_kind":      result.Kind.String(),
+			"vector_search_ms": durationMillis(start),
+			"result_count":     len(result.RawNeighbors),
+			"candidate_count":  0,
+			"distance_metric":  inputs.ModelInfo.GetDistanceMetric(),
+			"requested_k":      maxResults,
+		}, effectiveCfg))
+		return result, nil
+	}
+
 	resp, err := s.vectorFilters.client.KNN(ctx, &kvstorev1.KNNRequest{
 		Query: &kvstorev1.Vector{Values: inputs.QueryVector},
-		K:     cfg.GetMaxResults(),
-		Model: strings.TrimSpace(cfg.GetModelName()),
+		K:     maxResults,
+		Model: strings.TrimSpace(effectiveCfg.GetModelName()),
 	})
 	if err != nil {
 		return searchResult{}, wrapVectorKVError("vector_dimension search", err)
@@ -183,21 +243,27 @@ func (s *DataLoaderServer) searchNeighbors(
 		DistanceMetric: inputs.ModelInfo.GetDistanceMetric(),
 		Kind:           searchKindGlobalKNN,
 	}
-	logBenchmarkEvent(ctx, "vector_search_done", map[string]any{
+	logBenchmarkEvent(ctx, "vector_search_done", appendVectorQueryBenchmarkFields(map[string]any{
 		"model_name":       inputs.ModelInfo.GetName(),
 		"search_kind":      result.Kind.String(),
 		"vector_search_ms": durationMillis(start),
 		"result_count":     len(result.RawNeighbors),
 		"candidate_count":  0,
 		"distance_metric":  inputs.ModelInfo.GetDistanceMetric(),
-		"requested_k":      cfg.GetMaxResults(),
-	})
+		"requested_k":      maxResults,
+	}, effectiveCfg))
 	return result, nil
 }
 
 func bucketSearchResult(cfg *pb.VectorSearchDimension, result searchResult) (*vectorDimensionResult, error) {
-	localCfg := applyMetricDefaults(bucketConfigFromProto(cfg.GetBucketCfg()), result.DistanceMetric, result.RawNeighbors)
-	filtered := filterNeighborsByRange(result.RawNeighbors, localCfg.DistanceMin, localCfg.DistanceMax, cfg.GetMaxResults())
+	localCfg := bucketConfigFromProto(cfg.GetBucketCfg())
+	if minDistance, maxDistance, ok := vectorDistanceRange(cfg); ok {
+		localCfg.DistanceMin = minDistance
+		localCfg.DistanceMax = maxDistance
+	} else {
+		localCfg = applyMetricDefaults(localCfg, result.DistanceMetric, result.RawNeighbors)
+	}
+	filtered := filterNeighborsByRange(result.RawNeighbors, localCfg.DistanceMin, localCfg.DistanceMax, effectiveVectorMaxResults(cfg))
 	boundaries, err := computeBucketBoundaries(localCfg, filtered)
 	if err != nil {
 		return nil, err

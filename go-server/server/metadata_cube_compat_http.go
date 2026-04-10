@@ -98,8 +98,9 @@ type compatBucketInfo struct {
 }
 
 type compatBrowsingStateEnvelope struct {
-	BucketInfos []compatBucketInfo            `json:"bucketInfos"`
-	Cells       []compatBrowsingStateResponse `json:"cells"`
+	BucketInfos     []compatBucketInfo            `json:"bucketInfos,omitempty"`
+	AxisBucketInfos map[string][]compatBucketInfo `json:"axisBucketInfos,omitempty"`
+	Cells           []compatBrowsingStateResponse `json:"cells"`
 }
 
 type compatCubeObjectTag struct {
@@ -121,6 +122,19 @@ func parsePathInt64(r *http.Request, key string) (int64, error) {
 	return strconv.ParseInt(v, 10, 64)
 }
 
+func normalizeThumbnailRedirectTarget(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	if strings.HasPrefix(trimmed, "http://") ||
+		strings.HasPrefix(trimmed, "https://") ||
+		strings.HasPrefix(trimmed, "/") {
+		return trimmed
+	}
+	return "/" + trimmed
+}
+
 func tagDisplayNameSQL(exprPrefix string) string {
 	// exprPrefix should include the trailing dot, e.g. "t." or "n." when referencing a tag id column.
 	// We assume subtype tables are joined on the tag id.
@@ -133,6 +147,45 @@ func tagDisplayNameSQL(exprPrefix string) string {
 			nt.name::text
 		)`,
 	) + " /* " + exprPrefix + "id */"
+}
+
+// GetMetaDataCubeCompatMediaThumbnailHandler serves GET /api/media/{id}/thumbnail.
+func GetMetaDataCubeCompatMediaThumbnailHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		id, err := parsePathInt64(r, "id")
+		if err != nil || id <= 0 {
+			http.Error(w, "invalid id", http.StatusBadRequest)
+			return
+		}
+
+		var thumbnailURI string
+		err = db.QueryRowContext(
+			r.Context(),
+			"SELECT thumbnail_uri FROM public.medias WHERE id = $1",
+			id,
+		).Scan(&thumbnailURI)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "media not found", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			http.Error(w, fmt.Sprintf("db query failed: %v", err), http.StatusBadGateway)
+			return
+		}
+
+		target := normalizeThumbnailRedirectTarget(thumbnailURI)
+		if target == "" {
+			http.Error(w, "thumbnail not found", http.StatusNotFound)
+			return
+		}
+
+		http.Redirect(w, r, target, http.StatusTemporaryRedirect)
+	}
 }
 
 // GetMetaDataCubeCompatTagsetsHandler serves GET /api/tagset as a plain JSON array.
@@ -846,18 +899,13 @@ func GetMetaDataCubeCompatCellHandler(server *DataLoaderServer) http.HandlerFunc
 			http.Error(w, vectorFilterHTTPMessage(err), mapVectorFilterHTTPStatus(err))
 			return
 		}
-		vectorDimensionCfg, err := parseCompatVectorDimension(r.URL.Query().Get("vectorDimension"))
+		mergedVectorDims, err := parseCompatVectorDimensions(r.URL.Query())
 		if err != nil {
 			http.Error(w, vectorFilterHTTPMessage(err), mapVectorFilterHTTPStatus(err))
 			return
 		}
-		vectorBucketID, err := parseCompatVectorBucketID(r.URL.Query().Get("vectorBucketId"))
-		if err != nil {
+		if err := validateVectorFilterAgainstDimensions(vectorFilterCfg, mergedVectorDims.Dims); err != nil {
 			http.Error(w, vectorFilterHTTPMessage(err), mapVectorFilterHTTPStatus(err))
-			return
-		}
-		if vectorFilterCfg != nil && vectorDimensionCfg != nil {
-			http.Error(w, "vectorFilter and vectorDimension cannot be used together", http.StatusBadRequest)
 			return
 		}
 		if vectorFilterCfg != nil {
@@ -877,11 +925,10 @@ func GetMetaDataCubeCompatCellHandler(server *DataLoaderServer) http.HandlerFunc
 			AxisZ:     axisZ,
 			Filters:   filters,
 		}
-		plan, err = server.applyVectorDimensionToPlan(
+		plan, err = server.applyVectorDimensionsToPlan(
 			r.Context(),
 			plan,
-			vectorDimensionCfg,
-			vectorBucketID,
+			mergedVectorDims,
 			strings.TrimSpace(req.All) != "",
 			strings.TrimSpace(req.Timeline) != "",
 			rebucketOnly,
@@ -988,6 +1035,13 @@ func GetMetaDataCubeCompatCellHandler(server *DataLoaderServer) http.HandlerFunc
 			return
 		}
 
+		if plan.UseAxisBucketInfos && len(plan.AxisBucketInfos) > 0 {
+			writeJSON(w, http.StatusOK, compatBrowsingStateEnvelope{
+				AxisBucketInfos: convertCompatAxisBucketInfos(plan.AxisBucketInfos),
+				Cells:           out,
+			})
+			return
+		}
 		if len(plan.BucketInfos) > 0 {
 			writeJSON(w, http.StatusOK, compatBrowsingStateEnvelope{
 				BucketInfos: convertCompatBucketInfos(plan.BucketInfos),
@@ -1029,6 +1083,18 @@ func convertCompatBucketInfos(infos []*pb.BucketInfo) []compatBucketInfo {
 			UpperBound: info.GetUpperBound(),
 			Label:      info.GetLabel(),
 		})
+	}
+	return out
+}
+
+func convertCompatAxisBucketInfos(infos map[string][]*pb.BucketInfo) map[string][]compatBucketInfo {
+	if len(infos) == 0 {
+		return nil
+	}
+
+	out := make(map[string][]compatBucketInfo, len(infos))
+	for axisKey, bucketInfos := range infos {
+		out[axisKey] = convertCompatBucketInfos(bucketInfos)
 	}
 	return out
 }

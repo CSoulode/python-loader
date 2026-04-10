@@ -119,6 +119,8 @@ const (
 	Experiment5 ExperimentID = "exp5"
 	Experiment6 ExperimentID = "exp6"
 	Experiment7 ExperimentID = "exp7"
+	Experiment8 ExperimentID = "exp8"
+	Experiment9 ExperimentID = "exp9"
 )
 
 type Options struct {
@@ -209,7 +211,7 @@ func ParseExperiments(value string) ([]ExperimentID, error) {
 	out := make([]ExperimentID, 0, len(items))
 	for _, item := range items {
 		switch ExperimentID(item) {
-		case Experiment1, Experiment2, Experiment3, Experiment4, Experiment5, Experiment6, Experiment7:
+		case Experiment1, Experiment2, Experiment3, Experiment4, Experiment5, Experiment6, Experiment7, Experiment8, Experiment9:
 			out = append(out, ExperimentID(item))
 		default:
 			return nil, fmt.Errorf("unsupported experiment %q", item)
@@ -227,6 +229,8 @@ func orderedExperiments() []ExperimentID {
 		Experiment1,
 		Experiment3,
 		Experiment4,
+		Experiment8,
+		Experiment9,
 		Experiment5,
 		Experiment6,
 		Experiment7,
