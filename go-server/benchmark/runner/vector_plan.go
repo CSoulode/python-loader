@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
 
 	pb "m3.dataloader/dataloader"
 )
@@ -24,6 +25,38 @@ type VectorQueryPlan struct {
 
 func (p VectorQueryPlan) Label() string {
 	return string(p.Mode)
+}
+
+func (p VectorQueryPlan) QueryType() string {
+	switch p.Mode {
+	case QueryModeRangeBall:
+		return "ball"
+	case QueryModeRangeRing:
+		return "ring"
+	default:
+		return "knn"
+	}
+}
+
+func (p VectorQueryPlan) DistanceMin() float64 {
+	if p.DistanceRange == nil {
+		return 0
+	}
+	return float64(p.DistanceRange.GetMinDistance())
+}
+
+func (p VectorQueryPlan) DistanceMax() float64 {
+	if p.DistanceRange == nil {
+		return 0
+	}
+	return float64(p.DistanceRange.GetMaxDistance())
+}
+
+func (p VectorQueryPlan) RangeWidth() float64 {
+	if p.DistanceRange == nil {
+		return 0
+	}
+	return math.Max(0, p.DistanceMax()-p.DistanceMin())
 }
 
 func KNNPlan(k int32) VectorQueryPlan {

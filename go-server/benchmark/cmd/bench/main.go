@@ -28,7 +28,6 @@ func run() error {
 		return err
 	}
 
-	defaultOutputRoot := filepath.Join(root, "docs", "experiments", "phase_d4_range_"+time.Now().UTC().Format("2006-01-02"))
 	defaultEnvFile := filepath.Join(root, "python-loader", "go-server", ".env")
 	defaultModelsFile := filepath.Join(root, "vectorkv", "config", "models.json")
 
@@ -44,7 +43,7 @@ func run() error {
 	flag.StringVar(&experimentsValue, "experiments", "", "comma-separated experiment ids: exp1..exp9")
 	flag.StringVar(&datasetsValue, "datasets", "", "comma-separated dataset labels from --dataset-config (defaults: 182k,725k)")
 	flag.StringVar(&datasetConfig, "dataset-config", "", "comma-separated dataset specs: label:size:dsn_env")
-	flag.StringVar(&outputRoot, "output-root", defaultOutputRoot, "output root for raw/ figures/ analysis/")
+	flag.StringVar(&outputRoot, "output-root", "", "output root for the generated experiment tree (defaults to a dataset-aware future_experiment_framework_* path)")
 	flag.StringVar(&envFile, "go-server-env-file", defaultEnvFile, "path to go-server .env")
 	flag.StringVar(&modelsFile, "vector-models-file", defaultModelsFile, "path to vectorkv models.json")
 	flag.BoolVar(&keepServices, "keep-services", false, "leave managed services running after benchmark completes")
@@ -57,6 +56,9 @@ func run() error {
 	datasets, err := runner.ParseDatasets(datasetsValue, catalog)
 	if err != nil {
 		return err
+	}
+	if outputRoot == "" {
+		outputRoot = defaultOutputRoot(root, datasets)
 	}
 	experiments, err := runner.ParseExperiments(experimentsValue)
 	if err != nil {
@@ -74,4 +76,16 @@ func run() error {
 		DatasetCatalog:   catalog,
 	}
 	return runner.Run(context.Background(), opts)
+}
+
+func defaultOutputRoot(root string, datasets []runner.DatasetID) string {
+	dateLabel := time.Now().UTC().Format("20060102")
+	switch len(datasets) {
+	case 0:
+		return filepath.Join(root, "docs", "experiments", "future_experiment_framework_"+dateLabel)
+	case 1:
+		return filepath.Join(root, "docs", "experiments", fmt.Sprintf("future_experiment_framework_%s_%s", datasets[0], dateLabel))
+	default:
+		return filepath.Join(root, "docs", "experiments", "future_experiment_framework_multi_"+dateLabel)
+	}
 }

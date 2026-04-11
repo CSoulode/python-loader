@@ -5,67 +5,39 @@ import (
 	"fmt"
 	"path/filepath"
 
+	benchindex "m3.dataloader/benchmark/index"
 	pb "m3.dataloader/dataloader"
 )
 
 const expRangeProbeK int32 = 500
 
 func (r *BenchRunner) RunExperiment8(ctx context.Context) error {
-	rows := make([][]string, 0, len(r.opts.Datasets)*len(r.catalog.Models)*2)
-	state := SelectivityBenchmarkState()
-
+	specs := []benchindex.Spec{
+		{Type: benchindex.HNSW, Precision: benchindex.FullPrecision, IterativeMode: benchindex.IterativeOff},
+		{Type: benchindex.IVFFlat, Precision: benchindex.FullPrecision, IterativeMode: benchindex.IterativeOff},
+		{Type: benchindex.DiskANN, Precision: benchindex.FullPrecision, IterativeMode: benchindex.IterativeOff},
+		{Type: benchindex.NoIndex, Precision: benchindex.FullPrecision, IterativeMode: benchindex.IterativeOff},
+	}
+	rows := make([][]string, 0, len(r.opts.Datasets)*len(specs)*len(r.catalog.Models)*18)
 	for _, dataset := range r.opts.Datasets {
-		err := r.withDefaultSession(ctx, dataset, func(session *ActiveSession) error {
-			for modelIndex, model := range r.catalog.Models {
-				query, err := BuildBenchmarkQuery(ctx, session.DB, state, model, 1.0, expQueryID("exp8", modelIndex), modelIndex)
+		for _, spec := range specs {
+			err := r.withIndexedSession(ctx, dataset, spec, r.catalog.Models, func(session *ActiveSession, _ map[string]*benchindex.RebuildResult) error {
+				currentRows, err := r.runRangeQueryMatrix(ctx, session, dataset, spec)
 				if err != nil {
 					return err
 				}
-				vector, err := fetchReferenceVector(ctx, session, query)
-				if err != nil {
-					return err
-				}
-				plans, err := BuildVectorPlans(ctx, session.DB, query, vector, nil, expRangeProbeK)
-				if err != nil {
-					return err
-				}
-				for _, plan := range rangeOnlyPlans(plans) {
-					approx, latencyMS, err := measureSearchMedian(ctx, func(runCtx context.Context) ([]Neighbor, error) {
-						return searchNeighborsForPlan(runCtx, session, query, vector, nil, plan)
-					})
-					if err != nil {
-						return err
-					}
-					exact, err := exactNeighborsForPlan(ctx, session.DB, query, vector, nil, plan)
-					if err != nil {
-						return err
-					}
-					rows = append(rows, []string{
-						query.Model.Name,
-						plan.Label(),
-						FormatFloat(float64(plan.DistanceRange.GetMinDistance())),
-						FormatFloat(float64(plan.DistanceRange.GetMaxDistance())),
-						FormatFloat(float64(plan.DistanceRange.GetMaxDistance() - plan.DistanceRange.GetMinDistance())),
-						string(defaultRuntimeSpec().Type),
-						"vector_only",
-						fmt.Sprintf("%d", len(approx)),
-						FormatFloat(latencyMS),
-						FormatFloat(RecallAtK(approx, exact, int(plan.MaxResults))),
-						r.opts.DatasetLabel(dataset),
-						r.opts.DatasetSizeLabel(dataset),
-					})
-				}
+				rows = append(rows, currentRows...)
+				return nil
+			})
+			if err != nil {
+				return err
 			}
-			return nil
-		})
-		if err != nil {
-			return err
 		}
 	}
 
 	return WriteCSV(
 		filepath.Join(r.paths.RawDir, "exp8_range_query.csv"),
-		[]string{"model", "query_type", "dist_min", "dist_max", "range_width", "index_type", "strategy", "result_count", "latency_ms", "recall", "dataset_label", "dataset_size"},
+		[]string{"model", "query_type", "range_position", "range_width_label", "dist_min", "dist_max", "range_width", "index_type", "strategy", "result_count", "latency_ms", "recall", "dataset_label", "dataset_size"},
 		rows,
 	)
 }
@@ -114,9 +86,62 @@ func (r *BenchRunner) RunExperiment9(ctx context.Context) error {
 
 	return WriteCSV(
 		filepath.Join(r.paths.RawDir, "exp9_range_filter_strategy.csv"),
-		[]string{"selectivity", "range_type", "dist_min", "dist_max", "strategy", "candidate_count", "result_count", "ttlb_ms", "vector_search_ms", "join_ms", "dataset_label", "dataset_size"},
+		[]string{"selectivity", "query_type", "dist_min", "dist_max", "strategy", "selected_strategy", "candidate_count", "result_count", "ttfb_ms", "ttlb_ms", "vector_search_ms", "join_ms", "dataset_label", "dataset_size"},
 		rows,
 	)
+}
+
+func (r *BenchRunner) runRangeQueryMatrix(
+	ctx context.Context,
+	session *ActiveSession,
+	dataset DatasetID,
+	spec benchindex.Spec,
+) ([][]string, error) {
+	state := SelectivityBenchmarkState()
+	rows := make([][]string, 0, len(r.catalog.Models)*18)
+	for modelIndex, model := range r.catalog.Models {
+		query, err := BuildBenchmarkQuery(ctx, session.DB, state, model, 1.0, expQueryID("exp8", modelIndex), modelIndex)
+		if err != nil {
+			return nil, err
+		}
+		vector, err := fetchReferenceVector(ctx, session, query)
+		if err != nil {
+			return nil, err
+		}
+		cases, err := BuildRangeMatrixCases(ctx, session.DB, query, vector, nil, expRangeProbeK)
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range cases {
+			approx, latencyMS, err := measureSearchMedian(ctx, func(runCtx context.Context) ([]Neighbor, error) {
+				return searchNeighborsForPlan(runCtx, session, query, vector, nil, item.Plan)
+			})
+			if err != nil {
+				return nil, err
+			}
+			exact, err := exactNeighborsForPlan(ctx, session.DB, query, vector, nil, item.Plan)
+			if err != nil {
+				return nil, err
+			}
+			rows = append(rows, []string{
+				query.Model.Name,
+				item.Plan.QueryType(),
+				item.RangePosition,
+				item.WidthLabel,
+				FormatFloat(item.Plan.DistanceMin()),
+				FormatFloat(item.Plan.DistanceMax()),
+				FormatFloat(item.Plan.RangeWidth()),
+				string(spec.Type),
+				rangeExecutionPath(item.Plan),
+				fmt.Sprintf("%d", len(approx)),
+				FormatFloat(latencyMS),
+				FormatFloat(RecallAtK(approx, exact, int(item.Plan.MaxResults))),
+				r.opts.DatasetLabel(dataset),
+				r.opts.DatasetSizeLabel(dataset),
+			})
+		}
+	}
+	return rows, nil
 }
 
 func (r *BenchRunner) runRangeStrategyCases(
@@ -149,12 +174,14 @@ func (r *BenchRunner) runRangeStrategyCases(
 		}
 		out = append(out, []string{
 			FormatFloat(query.ActualSelectivity),
-			plan.Label(),
-			FormatFloat(float64(plan.DistanceRange.GetMinDistance())),
-			FormatFloat(float64(plan.DistanceRange.GetMaxDistance())),
+			plan.QueryType(),
+			FormatFloat(plan.DistanceMin()),
+			FormatFloat(plan.DistanceMax()),
 			item.name,
+			summary.Strategy,
 			fmt.Sprintf("%d", query.ActualCandidateCount),
 			fmt.Sprintf("%d", totalResponseCount(sample.Items)),
+			FormatFloat(summary.TTFB),
 			FormatFloat(summary.TTLB),
 			FormatFloat(summary.VectorSearchMS),
 			FormatFloat(summary.SQLExecMS),
@@ -163,6 +190,13 @@ func (r *BenchRunner) runRangeStrategyCases(
 		})
 	}
 	return out, nil
+}
+
+func rangeExecutionPath(plan VectorQueryPlan) string {
+	if plan.Mode == QueryModeRangeBall {
+		return "knn_adapter"
+	}
+	return "brute_force"
 }
 
 func rangeOnlyPlans(plans []VectorQueryPlan) []VectorQueryPlan {

@@ -39,7 +39,7 @@ func (r *BenchRunner) RunExperiment1(ctx context.Context) error {
 	}
 	return WriteCSV(
 		filepath.Join(r.paths.RawDir, "exp1_strategy_comparison.csv"),
-		[]string{"query_mode", "selectivity", "k", "dataset_label", "dataset_size", "strategy", "ttfb_ms", "ttlb_ms", "vector_search_ms", "join_ms"},
+		[]string{"selectivity", "k", "dataset_label", "dataset_size", "strategy", "query_mode", "dist_min", "dist_max", "ttfb_ms", "ttlb_ms", "vector_search_ms", "join_ms"},
 		rows,
 	)
 }
@@ -86,6 +86,7 @@ func (r *BenchRunner) runStrategyComparisonPlanCases(
 	plan VectorQueryPlan,
 ) ([][]string, error) {
 	out := make([][]string, 0, 4)
+	distMin, distMax := planDistanceBoundsCSV(plan)
 	for _, item := range []struct {
 		name     string
 		strategy pb.HybridStrategy
@@ -103,12 +104,14 @@ func (r *BenchRunner) runStrategyComparisonPlanCases(
 			return nil, err
 		}
 		out = append(out, []string{
-			plan.Label(),
 			FormatFloat(query.ActualSelectivity),
-			fmt.Sprintf("%d", plan.MaxResults),
+			planKForCSV(plan),
 			r.opts.DatasetLabel(dataset),
 			r.opts.DatasetSizeLabel(dataset),
 			item.name,
+			plan.Label(),
+			distMin,
+			distMax,
 			FormatFloat(summary.TTFB),
 			FormatFloat(summary.TTLB),
 			FormatFloat(summary.VectorSearchMS),

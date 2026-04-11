@@ -18,4 +18,6 @@ go-server/out/*logs
 
 go-server/server/__debug*
 
-.codex/
+/.codex/
+.codex
+.codex-tasks/

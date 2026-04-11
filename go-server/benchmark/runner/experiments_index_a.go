@@ -34,7 +34,7 @@ func (r *BenchRunner) RunExperiment5(ctx context.Context) error {
 	}
 	return WriteCSV(
 		filepath.Join(r.paths.RawDir, "exp5_index_comparison.csv"),
-		[]string{"dataset_label", "dataset_size", "model", "index_type", "query_mode", "k", "selectivity", "ttfb_ms", "ttlb_ms", "recall_at_k", "index_size_mb"},
+		[]string{"model", "index_type", "query_mode", "k", "dist_min", "dist_max", "selectivity", "ttfb_ms", "ttlb_ms", "recall_at_k", "index_size_mb", "dataset_label", "dataset_size"},
 		rows,
 	)
 }
@@ -112,17 +112,20 @@ func (r *BenchRunner) runSingleIndexComparison(
 	if rebuild != nil {
 		indexSize = rebuild.IndexSizeMB
 	}
+	distMin, distMax := planDistanceBoundsCSV(plan)
 	return []string{
-		r.opts.DatasetLabel(dataset),
-		r.opts.DatasetSizeLabel(dataset),
 		query.Model.Name,
 		string(spec.Type),
 		plan.Label(),
-		fmt.Sprintf("%d", plan.MaxResults),
+		planKForCSV(plan),
+		distMin,
+		distMax,
 		FormatFloat(query.ActualSelectivity),
 		FormatFloat(summary.TTFB),
 		FormatFloat(summary.TTLB),
 		FormatFloat(recall),
 		FormatFloat(indexSize),
+		r.opts.DatasetLabel(dataset),
+		r.opts.DatasetSizeLabel(dataset),
 	}, nil
 }

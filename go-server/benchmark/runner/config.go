@@ -270,6 +270,8 @@ type OutputPaths struct {
 	Environment string
 	Summary     string
 	Feasibility string
+	Comparison  string
+	Report      string
 	Readme      string
 }
 
@@ -285,6 +287,8 @@ func NewOutputPaths(root string) OutputPaths {
 		Environment: filepath.Join(root, "environment.md"),
 		Summary:     filepath.Join(root, "summary.md"),
 		Feasibility: filepath.Join(root, "diskann_label_feasibility.md"),
+		Comparison:  filepath.Join(root, "comparison.md"),
+		Report:      filepath.Join(root, "report.md"),
 		Readme:      filepath.Join(root, "README.md"),
 	}
 }

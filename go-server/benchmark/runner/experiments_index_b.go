@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/lib/pq"
 
@@ -28,7 +29,7 @@ func (r *BenchRunner) RunExperiment6(ctx context.Context) error {
 	rows := make([][]string, 0, len(r.opts.Datasets)*len(filteredSelectivities)*len(specs))
 	for _, dataset := range r.opts.Datasets {
 		for _, spec := range specs {
-			err := r.withIndexedSession(ctx, dataset, spec, []BenchmarkModel{model}, func(session *ActiveSession, _ map[string]*benchindex.RebuildResult) error {
+			err := r.withIndexedSession(ctx, dataset, spec, []BenchmarkModel{model}, func(session *ActiveSession, rebuild map[string]*benchindex.RebuildResult) error {
 				manager := benchindex.NewManager(session.DB)
 				for index, selectivity := range filteredSelectivities {
 					query, err := BuildBenchmarkQuery(ctx, session.DB, state, model, selectivity, expQueryID("q", index), index)
@@ -70,6 +71,11 @@ func (r *BenchRunner) RunExperiment6(ctx context.Context) error {
 					if err := writeExplainPlan(r.paths.ExplainDir, dataset, spec, selectivity, plan); err != nil {
 						return err
 					}
+					rebuildResult := rebuild[model.Name]
+					usedVectorANNIndex := false
+					if rebuildResult != nil && rebuildResult.IndexName != "" {
+						usedVectorANNIndex = strings.Contains(plan, rebuildResult.IndexName)
+					}
 					rows = append(rows, []string{
 						r.opts.DatasetLabel(dataset),
 						r.opts.DatasetSizeLabel(dataset),
@@ -81,6 +87,7 @@ func (r *BenchRunner) RunExperiment6(ctx context.Context) error {
 						FormatFloat(RecallAtK(neighbors, exact, 500)),
 						FormatFloat(latency),
 						fmt.Sprintf("%t", usedIndex),
+						fmt.Sprintf("%t", usedVectorANNIndex),
 					})
 				}
 				return nil
@@ -92,7 +99,7 @@ func (r *BenchRunner) RunExperiment6(ctx context.Context) error {
 	}
 	return WriteCSV(
 		filepath.Join(r.paths.RawDir, "exp6_iterative_scan.csv"),
-		[]string{"dataset_label", "dataset_size", "index_type", "iterative_scan", "selectivity", "k", "returned_count", "recall_at_k", "latency_ms", "plan_used_index"},
+		[]string{"dataset_label", "dataset_size", "index_type", "iterative_scan", "selectivity", "k", "returned_count", "recall_at_k", "latency_ms", "plan_used_index", "plan_used_vector_ann_index"},
 		rows,
 	)
 }

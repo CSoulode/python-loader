@@ -4,7 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sync"
 )
+
+type modelObjectCountCacheKey struct {
+	db    *sql.DB
+	table string
+}
+
+var modelObjectCountCache sync.Map
 
 func CountModelCandidates(ctx context.Context, db *sql.DB, query *BenchmarkQuery) (int64, error) {
 	sqlStr, err := modelCandidateSQL(query)
@@ -41,6 +49,13 @@ func LoadModelCandidateIDs(ctx context.Context, db *sql.DB, query *BenchmarkQuer
 }
 
 func totalModelObjectCount(ctx context.Context, db *sql.DB, model BenchmarkModel) (int64, error) {
+	cacheKey := modelObjectCountCacheKey{
+		db:    db,
+		table: model.Table,
+	}
+	if cached, ok := modelObjectCountCache.Load(cacheKey); ok {
+		return cached.(int64), nil
+	}
 	query := fmt.Sprintf(`
 SELECT COUNT(DISTINCT tg.object_id)
 FROM %s v
@@ -48,7 +63,11 @@ JOIN public.taggings tg ON tg.tag_id = v.id
 WHERE %s`, model.Table, modelTagsetCondition(model, "v"))
 	var total int64
 	err := db.QueryRowContext(ctx, query).Scan(&total)
-	return total, err
+	if err != nil {
+		return 0, err
+	}
+	modelObjectCountCache.Store(cacheKey, total)
+	return total, nil
 }
 
 func modelCandidateSQL(query *BenchmarkQuery) (string, error) {
