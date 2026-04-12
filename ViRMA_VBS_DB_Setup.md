@@ -1,45 +1,61 @@
-Create Database
-================
-1. Install PostgreSQL (pgAdmin optional)
-2. Create database VBS24: createdb -U postgres VBS24
-3. Go to python-loader
-4. Load Database Schema: psql -U postgres -f ddl.sql VBS24
+# ViRMA / VBS24 Legacy Setup Note
 
+This file documents an older Python-server-based setup flow.
 
-How to install gRPC Server
-===========================
-1. Go to python-loader
-2. Enter server
-3. Create a Python environment: python -m venv vbs_loader
-4. Activate environment: .\vbs_loader\Scripts\activate.bat
-5. Install requirements: pip install -r requirements.txt
-6. Update database info in app.py: psycopg.connect(...)
-7. Run server: python app.py
+It is **not** the current workspace baseline.
 
+Use these documents first for the current setup:
 
-How to load data
-=================
-1. Go to python-loader/client
-2. Create a Python environment: python -m venv vbs_client
-3. Activate environment: .\vbs_client\Scripts\activate.bat
-4. Install client: pip install --editable .
-You may encounter the following warnings:
+- `/workspaces/m3-workspace/docs/architecture/workspace_runtime.md`
+- `/workspaces/m3-workspace/python-loader/README.md`
+- `/workspaces/m3-workspace/python-loader/docs/PROJECT_EXPLANATION.zh-CN.md`
 
-WARNING: The script tqdm.exe is installed in 'C:\Users\ok261\AppData\Roaming\Python\Python311\Scripts' which is not on PATH.
-  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
-  WARNING: The script loader.exe is installed in 'C:\Users\ok261\AppData\Roaming\Python\Python311\Scripts' which is not on PATH.
-  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+## What This File Still Applies To
 
-4.1 In case of the warning add the specified location to your enviroment PATH
+Use the steps below only if you explicitly need the legacy Python `server/` and `client/` flow for historical data-loading or compatibility work.
 
-NOTE: After installing the client you may need to reopen the terminal
+## Legacy Database Setup
 
-5. Go to VBS24-Mini
-6. Run: loader.exe import vbs_m3_test_ts+m.json
-7. Run: loader.exe import vbs_m3_test_ts+h.json
+1. Install PostgreSQL.
+2. Create the database:
 
+```bash
+createdb -U postgres VBS24
+```
 
-Create Materialized Views
-==========================
-1. Run views.sql
+3. Load the base schema from `python-loader/`:
 
+```bash
+cd /workspaces/m3-workspace/python-loader
+psql -U postgres -f ddl.sql VBS24
+psql -U postgres -f views.sql VBS24
+```
+
+## Legacy Python gRPC Server
+
+1. Go to `python-loader/server`.
+2. Create a virtual environment.
+3. Activate it.
+4. Install requirements.
+5. Update the database connection in `app.py`.
+6. Run:
+
+```bash
+python app.py
+```
+
+## Legacy Loader Client
+
+1. Go to `python-loader/client`.
+2. Create and activate a virtual environment.
+3. Install the client in editable mode:
+
+```bash
+pip install --editable .
+```
+
+4. Import the historical sample files with the `loader` CLI.
+
+## Warning
+
+This legacy path is not the main implementation path in the current workspace. The active backend is `python-loader/go-server`, and vector-aware runtime behavior depends on the sibling `vectorkv` repository rather than this older Python flow.

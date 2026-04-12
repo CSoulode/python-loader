@@ -68,7 +68,7 @@
 
 - **Go DataLoader** 是“核心服务”。它直接连 Postgres，通过 gRPC/HTTP 对外提供接口。
 - **VectorKV（工作区同级仓库 `vectorkv/`）** 是“向量存储 + ANN 查询”的独立服务/工具（本阶段已实现）。它与 go-server **共用同一个 DB/schema**，并把 embedding 写入 M³ 的 `tags/<model>_tags/taggings` 链路，NN/KNN 返回 `medias.id`。
-- 需要特别说明：**当前 `python-loader/` 代码树里并没有 go-server 直连 `vectorkv` 的 gRPC client 实现**。两者当前已经落地的耦合点是共享数据库、共享 `medias.id/object_id` 语义，以及根目录架构文档约定的跨仓库设计边界；更高层的混合编排不在这份代码快照里。
+- 需要特别说明：**当前 `python-loader/go-server` 已经包含直连 `vectorkv` 的 gRPC client 集成**。相关逻辑主要落在 `go-server/server/vector_filter.go`、`vector_dimension.go`、`vector_dimension_strategy.go` 与 `server.go`：它会通过 `VECTORKV_ADDR` 建立 gRPC 连接，消费 `KNN` / `FilteredKNN` / `RangeSearch` / `FilteredRangeSearch` / `ListModels`，并把结果注入 browsing-state 管道。
 - **RabbitMQ + Plugins + Media Downloader** 是“可选的自动标注/信息提取管线”。它们让系统能在新媒体进入后自动提取 EXIF、生成 caption、分类、做人脸识别等，然后把结果作为 taggings 写回数据库。
 - 当前分支里 RabbitMQ 相关代码在 `go-server/server/server.go` 的 `main()` 内有注释掉的部分（见后文“插件管线现状”），意味着：**代码具备插件机制，但是否启用取决于你怎么部署/是否把那段启用逻辑打开**。
 
@@ -504,14 +504,13 @@ Go server 侧有对应消费者逻辑：
 
 ---
 
-## 11. README/历史遗留的“容易踩坑”点（为什么你会觉得 README 不准）
+## 11. 当前仍需注意的历史边界
 
-结合当前仓库内容，README 里至少有这些可能不准确/容易误导的地方：
+结合当前仓库内容，仍有这些容易踩坑的历史边界需要单独注意：
 
-- README 说 “Docker 当前没用”，但仓库里有 `docker-compose.yaml`，并且 Go server/插件都有 Dockerfile（说明 Docker 已经是目标运行方式之一）。
-- README 仍把 `vectorkv/` 写成 `python-loader/` 内的目录，并引用了不存在的 `docs/vector_support_design.md`；在当前多仓库 workspace 中，`vectorkv/` 是工作区同级 repo，共享设计文档在工作区根目录 `docs/architecture/vector_design.md`。
-- Python server（`server/app.py`）使用的 `server/dataloader_pb2.py` 似乎来自较旧的 proto（消息名如 `MediaResponse` 等），与 `protos/dataloader.proto` 不一致；因此“Python/Go server 可互换”这句话需要重新验证。
-- Go server 的实现重心显然在 browsing state 与 HTTP 兼容层，但部分 loader/streaming RPC 还没补齐（例如 `createMediaStream/createTagStream/getChildNodes` 等）。
+- Python server（`server/app.py`）使用的 `server/dataloader_pb2.py` 与当前 `protos/dataloader.proto` 的对齐状态需要重新验证，因此“Python/Go server 可互换”不能默认成立。
+- Go server 的实现重心显然在 browsing state 与 HTTP 兼容层，但部分 loader/streaming RPC 仍未补齐（例如 `createMediaStream`、`createTagStream`、`getChildNodes` 等）。
 - Go server 的 `GetTagSetsById` 会查询数据库视图/表 `tagset_tags`、`tagset_hierarchies`，但当前仓库提供的 `ddl.sql` 与 `views.sql` 并未创建它们；如果你要用到该接口，需要补齐相应 SQL（或改用其它查询方式）。
+- `docker-compose.yaml` 与当前仓库中的 RabbitMQ/env 文件路径仍存在错配，若要用 compose 跑完整插件链，必须先逐项复核。
 
-建议把 README 当作“历史背景+大概方向”，而把本说明文档和代码实现作为“当前事实来源”。
+当前顶层 `README.md` 已按 workspace 现状刷新；涉及更细粒度实现事实时，仍以本说明文档和代码实现为准。

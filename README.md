@@ -1,226 +1,120 @@
-# M3-LOADER
+# python-loader
 
-This project is part of M3 Multi-Dimensional Data Model. It enables loading and exporting data to a postgres database from json files. This builds the database following the data model defined in order to be later visualized and explored using other tools.
+Main M3 backend repository in this workspace.
 
-> Current workspace note: for the real multi-repo startup path used in this workspace (`vectorkv` + `python-loader/go-server` + `MetaDataCube-Client_2024` + `server_media.py`), read `../docs/architecture/workspace_runtime.md` first. Parts of this README remain historical.
->
-> Note: This README is known to be partially outdated (e.g. Docker usage, Go HTTP gateway, browsing-state optimizations, plugin pipeline).  
-> For a more accurate, detailed “what this repo currently does” document, see `docs/PROJECT_EXPLANATION.zh-CN.md`.
+This repo owns:
 
-## Vector search (vectorkv)
+- `go-server/`: the active server implementation
+- `ddl.sql`, `views.sql`, `list_taggings.sql`: runtime SQL assets
+- `protos/dataloader.proto`: shared protobuf contract for this repo
+- legacy Python loader/client/server code that is still kept in-tree
 
-This repo now includes a separate Vector KV Store in `vectorkv/` that:
+In the current workspace layout, `python-loader/`, `MetaDataCube-Client_2024/`, and `vectorkv/` are sibling repositories. `vectorkv/` is not inside this repo.
 
-- Stores embeddings as **M³ vector tags** (`tags` → `<model>_tags` → `taggings`)
-- Serves NN/KNN queries over gRPC (`kvstore.v1.VectorKV`)
-- Supports **multiple models** per server (via `vectorkv/config/models.json`)
+For the authoritative cross-repo runtime and architecture baseline, read:
 
-See `vectorkv/README.md` for setup/commands and `docs/vector_support_design.md` for the database design.
+- `../docs/architecture/overview.md`
+- `../docs/architecture/vector_design.md`
+- `../docs/architecture/workspace_runtime.md`
 
-## Requirements
+For a repo-local, code-based explanation of the current implementation, read:
 
-- Python 3.10.11 or higher
-- PostgreSQL (pgvector extension required for vector search)
-- Go 
+- `docs/PROJECT_EXPLANATION.zh-CN.md`
 
-Docker is currently not used on this project.
+## Repository Layout
 
-## Installation
+- `go-server/`: current Go gRPC + HTTP server
+- `protos/`: protobuf source
+- `ddl.sql`, `views.sql`: schema and browsing-state support SQL
+- `client/`: legacy Python CLI/import-export tooling
+- `server/`: legacy Python gRPC server
+- `docs/`: repo-local documentation only
 
-To install the project, simply clone the repository.
+## Current Runtime Role
 
-## Usage
+In the current workspace, the common full stack is:
 
-### Running the test database
+1. PostgreSQL
+2. `vectorkv/`
+3. `python-loader/go-server/`
+4. `MetaDataCube-Client_2024/server_media.py`
+5. `MetaDataCube-Client_2024/`
 
-1. Create the postgres database:
+`go-server` is the primary backend. It serves:
 
-```shell
-$ createdb -U postgres <database_name>
+- gRPC browsing-state and loader APIs
+- HTTP compatibility endpoints under `/api/*` for the Angular client
+- vector-aware browsing-state integration through the sibling `vectorkv` service
+
+## Quick Start
+
+### Go server
+
+```bash
+cd /workspaces/m3-workspace/python-loader/go-server
+make run
 ```
 
-2. Create the tables using the ddl.sql file:
+`make run` loads environment variables from `.env`. For the current workspace values and startup order, use `../docs/architecture/workspace_runtime.md`.
 
-```shell
+### Database schema
+
+Create the base schema from this repo:
+
+```bash
+cd /workspaces/m3-workspace/python-loader
 psql -U postgres -f ddl.sql <database_name>
-```
-
-The default database name is `loader-testing`. If you change it make sure to update the database connection parameters in the `server` code.
-
-### Running the server
-
-The server is currently implemented in Python and Go. Both can be used interchangeably. They both connect to the client via a gRPC interface defined in the `protos` folder.
-
-#### Python server
-
-The Python server is located in the `server` directory. It is a grpc server which directly interacts with the Postgres DB using the library _psycopg2_. The whole code is in `app.py`, and all the "pb2" files are generated using grpc. The `words.py` file is a list of 6-letters english words used to identify requests and processes when troubleshooting code.
-
-To use the server:
-
-- Open a terminal in the `server` directory.
-- Create a python virtual environment and activate it:
-
-```shell
-$ python -m venv [server_venv_name]
-$ source [server_venv_name]/Scripts/activate
-```
-
-- Install requirements:
-
-```
-$ pip install -r requirements.txt_
-```
-
-- Update the database connection parameters in app.py, line 21:
-
-```python
-self.conn = psycopg2.connect(
-            database="loader-testing",
-            user="postgres",
-            password="root",
-            host="localhost",
-            port="5432",
-        )
-```
-
-- Run the server:
-
-```shell
-$ python app.py
-```
-
-#### Go Server
-
-The Go server is located in the `go-server` folder. Make sure the database parameters are set correctly in the `server.go` file, lines 25-34
-
-```go
-const (
-	dbname     = "loader-testing"
-	user       = "postgres"
-	pwd        = "root"
-	db_host    = "localhost"
-	db_port    = 5432
-	sv_host    = "localhost"
-	sv_port    = 50051
-	BATCH_SIZE = 5000
-)
-```
-
-You can then run the server :
-
-```shell
-$ cd go-server
-$ go mod tidy
-$ go build -o server/go-server ./server
-$ cd server
-$ ./go-server
-```
-
-### Client and CLI
-
-The client, CLI and test files are located in the `client` folder. All the "pb2" files are generated using grpc. The code of the grpc client is found in `grpc_client.py`, with functions specific to imports and exports located in the `filemgmt` folder. The CLI is based on the _Click_ library, and located in the `cli.py` file. Several JSON files for manual import/export testing are located in `json_testfiles` - 'm' is for medias, 'ts' for tagsets and 'h' for hierarchies; while files related to automated _Pytest_ testing are loacted in the `tests` folder. To use the CLI:
-
-In the `client` folder, enable the virtual environment:
-
-```shell
-$ python -m venv [client_venv_name]
-$ source [client_venv_name]/Scripts/activate
-```
-
-Now build the CLI:
-
-```shell
-$ pip install --editable .
-```
-
-Now, you will have instant updates upon changing the client code.
-
-Note: after adding new py files or changing dependencies, you need to update the _setup.py_ file and run the above command again.
-
-To interact with the loader, use `loader` command in the console from anywhere.
-
-To import data from a JSON file :
-
-```shell
-$ loader import -f json <json_file>
-```
-
-To export the data to a JSON file:
-
-```shell
-$ loader export -f json <json_file>
-```
-
-Currently, only json files are supported. The format for the json files is :
-
-```json
-{
-    "tagsets": [
-        {
-            "name": "ImageNet",
-            "type": 1
-        },
-        [...]
-    ],
-
-    "medias": [
-        {
-            "path": "http://localhost:5005/lsc/201903/16/20190316_131738_000.jpg",
-            "thumbnail": "http://localhost:5005/lsc/201903/16/20190316_131738_000.jpg",
-            "tags": [
-                {
-                    "tagset": "Collection",
-                    "value": "LSC2024"
-                },
-                {
-                    "tagset": "ImageNet",
-                    "value": "window screen"
-                },
-                [...]
-            ]
-        },
-        [...]
-    ],
-    "hierarchies": [
-        {
-            "name": "Day of Week",
-            "tagset": "Day of week (string)",
-            "rootnode": {
-                "tag": "Day of week",
-                "children": [
-                    {
-                        "tag": "Monday",
-                        "children": []
-                    },
-                    {
-                        "tag": "Tuesday",
-                        "children": []
-                    },
-                    [...]
-                ]
-            }
-        },
-        [...]
-    ]
-}
+psql -U postgres -f views.sql <database_name>
 ```
 
 ### Tests
 
-- Enable the client virtual environment.
-- Navigate to the `tests` folder.
-- Run the tests:
+General Go test run:
 
-```shell
-$ source [client_venv_name]/Scripts/activate
-$ cd tests
-$ pytest -vv
+```bash
+cd /workspaces/m3-workspace/python-loader/go-server
+set -a
+source .env
+set +a
+timeout 300 go test ./...
 ```
 
-### Updating Protocol Buffers
+When server tests need the workspace database:
 
-To generate Python protoc files from the protobuf definition, use the following script in the `client` or `server` folder.
+```bash
+cd /workspaces/m3-workspace/python-loader/go-server
+set -a
+source .env
+export PHASE_A_TEST_DATABASE_URL="postgres://postgres:root@db:5432/emm-cube?sslmode=disable"
+set +a
+timeout 300 go test ./server -run 'TestPhase(A|B|C|D1|D2|D4|E1)' -count=1
+```
 
+## Vector Search Boundary
+
+Vector storage and ANN search live in the sibling repo `../vectorkv/`.
+
+- setup and commands: `../vectorkv/README.md`
+- shared vector design: `../docs/architecture/vector_design.md`
+
+`python-loader/go-server` consumes vectorkv over gRPC and exposes the combined browsing-state behavior to clients.
+
+## Protocol Buffers
+
+Repo-root Python bindings script:
+
+```bash
+cd /workspaces/m3-workspace/python-loader/client
+source ../generate_protos
 ```
-$ source ../generate_protos
+
+Go bindings script:
+
+```bash
+cd /workspaces/m3-workspace/python-loader/go-server/dataloader
+./generate_protos_go
 ```
+
+## Legacy Code
+
+`client/` and `server/` remain in the repo for compatibility and historical workflows, but they are not the primary implementation path in this workspace. Treat `go-server/` as the active server path unless a task explicitly targets the legacy Python code.
