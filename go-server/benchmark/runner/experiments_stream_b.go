@@ -11,7 +11,8 @@ import (
 	pb "m3.dataloader/dataloader"
 )
 
-const benchmarkStreamBatchSize = "64"
+const benchmarkStreamBatchSize = 64
+const benchmarkStreamK = 500
 
 func (r *BenchRunner) RunExperiment3(ctx context.Context) error {
 	model, err := r.catalog.Default()
@@ -21,7 +22,7 @@ func (r *BenchRunner) RunExperiment3(ctx context.Context) error {
 	rows := make([][]string, 0, len(r.opts.Datasets)*10*12)
 	for _, dataset := range r.opts.Datasets {
 		err := r.withDefaultSessionServerEnv(ctx, dataset, map[string]string{
-			"STREAM_BATCH_SIZE": benchmarkStreamBatchSize,
+			"STREAM_BATCH_SIZE": fmt.Sprintf("%d", benchmarkStreamBatchSize),
 		}, func(session *ActiveSession) error {
 			queries, err := buildMixedQueries(ctx, session.DB, model, 10)
 			if err != nil {
@@ -62,16 +63,25 @@ func (r *BenchRunner) runJSDCases(
 		{name: "pre_filter", strategy: pb.HybridStrategy_PRE_FILTER},
 		{name: "hybrid", strategy: pb.HybridStrategy_HYBRID},
 	} {
-		_, err := executeMeasuredStream(ctx, session, dataset, Experiment3, query.ID+"-"+item.name, -1, query.Request(500, item.strategy, false, DefaultBucketConfig()))
+		if err := invalidateBrowsingStateCacheAll(ctx, session); err != nil {
+			return nil, err
+		}
+		_, err := executeMeasuredStream(ctx, session, dataset, Experiment3, query.ID+"-"+item.name, -1, query.Request(benchmarkStreamK, item.strategy, false, DefaultBucketConfig()))
 		if err != nil {
 			return nil, err
 		}
-		result, err := executeMeasuredStream(ctx, session, dataset, Experiment3, query.ID+"-"+item.name, 0, query.Request(500, item.strategy, false, DefaultBucketConfig()))
+		if err := invalidateBrowsingStateCacheAll(ctx, session); err != nil {
+			return nil, err
+		}
+		result, err := executeMeasuredStream(ctx, session, dataset, Experiment3, query.ID+"-"+item.name, 0, query.Request(benchmarkStreamK, item.strategy, false, DefaultBucketConfig()))
 		if err != nil {
 			return nil, err
 		}
 		states, elapsed := BuildCellSeries(result.Items)
-		points := BuildJSDSeries(states, elapsed, filterEvents(result.Events, "stream_flush"))
+		points := BuildJSDSeries(states, elapsed, benchmarkStreamBatchSize, int(benchmarkStreamK))
+		if len(points) == 0 {
+			return nil, fmt.Errorf("no JSD points for query=%s strategy=%s", query.ID, item.name)
+		}
 		for _, point := range points {
 			rows = append(rows, []string{
 				r.opts.DatasetLabel(dataset),
@@ -175,7 +185,7 @@ func sumRequestLatency(
 ) (float64, error) {
 	total := 0.0
 	for index, bucketCfg := range RebucketVariants() {
-		result, err := executeMeasuredStream(ctx, session, dataset, experiment, fmt.Sprintf("%s-r%d", query.ID, index), index, query.Request(500, pb.HybridStrategy_AUTO, rebucketOnly, bucketCfg))
+		result, err := executeMeasuredStreamAllowMissingEvents(ctx, session, dataset, experiment, fmt.Sprintf("%s-r%d", query.ID, index), index, query.Request(500, pb.HybridStrategy_AUTO, rebucketOnly, bucketCfg))
 		if err != nil {
 			return 0, err
 		}
@@ -208,16 +218,6 @@ func defaultRuntimeSpec() benchindex.Spec {
 		Precision:     benchindex.FullPrecision,
 		IterativeMode: benchindex.IterativeOff,
 	}
-}
-
-func filterEvents(events []BenchEvent, name string) []BenchEvent {
-	out := make([]BenchEvent, 0, len(events))
-	for _, event := range events {
-		if event.Event == name {
-			out = append(out, event)
-		}
-	}
-	return out
 }
 
 func strategyLabel(value string) string {

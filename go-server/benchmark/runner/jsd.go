@@ -16,29 +16,65 @@ type JSDPoint struct {
 func BuildJSDSeries(
 	states []map[string]CellState,
 	elapsed []time.Duration,
-	flushes []BenchEvent,
+	batchSize int,
+	maxCells int,
 ) []JSDPoint {
-	if len(states) == 0 || len(flushes) == 0 {
+	if len(states) == 0 || len(states) != len(elapsed) || batchSize <= 0 || maxCells <= 0 {
 		return nil
 	}
 	finalState := states[len(states)-1]
-	points := make([]JSDPoint, 0, len(flushes))
-	index := 0
-	for _, flush := range flushes {
-		index += flush.BatchSize
-		if index <= 0 || index > len(states) {
-			continue
+	cellsTotal := len(finalState)
+	if cellsTotal == 0 {
+		return nil
+	}
+
+	pointCount := (maxCells + batchSize - 1) / batchSize
+	points := make([]JSDPoint, 0, pointCount)
+	startIndex := 0
+	for batchIdx := 1; batchIdx <= pointCount; batchIdx++ {
+		threshold := minInt(batchIdx*batchSize, cellsTotal)
+		index := len(states) - 1
+		if threshold < cellsTotal {
+			index = firstStateAtCellCount(states, startIndex, threshold)
+			if index < 0 {
+				return nil
+			}
 		}
-		state := states[index-1]
-		points = append(points, JSDPoint{
-			BatchIdx:      flush.BatchIdx,
-			ElapsedMS:     durationToMS(elapsed[index-1]),
-			JSD:           JensenShannonDivergence(state, finalState),
-			CellsReceived: len(state),
-			CellsTotal:    len(finalState),
-		})
+		points = append(points, jsdPoint(batchIdx, elapsed[index], states[index], finalState))
+		startIndex = index
 	}
 	return points
+}
+
+func firstStateAtCellCount(states []map[string]CellState, startIndex int, minCells int) int {
+	for index := startIndex; index < len(states); index++ {
+		if len(states[index]) >= minCells {
+			return index
+		}
+	}
+	return -1
+}
+
+func minInt(left int, right int) int {
+	if left < right {
+		return left
+	}
+	return right
+}
+
+func jsdPoint(
+	batchIdx int,
+	elapsed time.Duration,
+	state map[string]CellState,
+	finalState map[string]CellState,
+) JSDPoint {
+	return JSDPoint{
+		BatchIdx:      batchIdx,
+		ElapsedMS:     durationToMS(elapsed),
+		JSD:           JensenShannonDivergence(state, finalState),
+		CellsReceived: len(state),
+		CellsTotal:    len(finalState),
+	}
 }
 
 func JensenShannonDivergence(current map[string]CellState, final map[string]CellState) float64 {

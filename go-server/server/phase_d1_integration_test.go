@@ -134,8 +134,12 @@ func TestPhaseD1PrefilterBucketDrillDownReturnsSelectedBucketOnly(t *testing.T) 
 	allResponses := collectBrowsingStateResponses(t, env.grpcClient, allReq)
 	assertAllCubeObjectIDs(t, allResponses, []int32{2})
 
-	if env.vectorKV.FilteredKNNCallCount() < 2 {
-		t.Fatalf("expected prefilter path for grid and all requests, got %d filtered calls", env.vectorKV.FilteredKNNCallCount())
+	if env.vectorKV.FilteredKNNCallCount() < 1 || env.vectorKV.KNNCallCount() != 0 {
+		t.Fatalf(
+			"expected cached prefilter path without global fallback, got knn=%d filtered=%d",
+			env.vectorKV.KNNCallCount(),
+			env.vectorKV.FilteredKNNCallCount(),
+		)
 	}
 }
 

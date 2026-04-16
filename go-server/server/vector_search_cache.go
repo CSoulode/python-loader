@@ -23,6 +23,7 @@ type vectorCacheQuery struct {
 	IsRange     bool
 	MinDistance float32
 	MaxDistance float32
+	Kind        SearchKind
 }
 
 type cacheKey struct {
@@ -32,6 +33,7 @@ type cacheKey struct {
 	IsRange    bool
 	MinBits    uint32
 	MaxBits    uint32
+	Kind       SearchKind
 }
 
 type cacheEntry struct {
@@ -81,7 +83,7 @@ func (c *VectorSearchCache) TryGet(
 	filterHash uint64,
 	reqK int32,
 ) (searchResult, bool) {
-	return c.tryGet(newKNNCacheQuery(modelName, refHash, filterHash, reqK), searchKindUnknown)
+	return c.tryGet(newKNNCacheQuery(modelName, refHash, filterHash, reqK, searchKindUnknown), searchKindUnknown)
 }
 
 func (c *VectorSearchCache) TryGetForConfig(
@@ -89,7 +91,16 @@ func (c *VectorSearchCache) TryGetForConfig(
 	refHash uint64,
 	filterHash uint64,
 ) (searchResult, bool) {
-	return c.tryGet(newCacheQueryFromConfig(cfg, refHash, filterHash), searchKindUnknown)
+	return c.tryGet(newCacheQueryFromConfig(cfg, refHash, filterHash, searchKindUnknown), searchKindUnknown)
+}
+
+func (c *VectorSearchCache) TryGetForConfigKind(
+	cfg *pb.VectorSearchDimension,
+	refHash uint64,
+	filterHash uint64,
+	kind SearchKind,
+) (searchResult, bool) {
+	return c.tryGet(newCacheQueryFromConfig(cfg, refHash, filterHash, kind), kind)
 }
 
 func (c *VectorSearchCache) TryGetGlobalKNN(
@@ -98,7 +109,7 @@ func (c *VectorSearchCache) TryGetGlobalKNN(
 	filterHash uint64,
 	reqK int32,
 ) (searchResult, bool) {
-	return c.tryGet(newKNNCacheQuery(modelName, refHash, filterHash, reqK), searchKindGlobalKNN)
+	return c.tryGet(newKNNCacheQuery(modelName, refHash, filterHash, reqK, searchKindGlobalKNN), searchKindGlobalKNN)
 }
 
 func (c *VectorSearchCache) TryGetGlobalForConfig(
@@ -106,7 +117,8 @@ func (c *VectorSearchCache) TryGetGlobalForConfig(
 	refHash uint64,
 	filterHash uint64,
 ) (searchResult, bool) {
-	return c.tryGet(newCacheQueryFromConfig(cfg, refHash, filterHash), globalSearchKindForConfig(cfg))
+	kind := globalSearchKindForConfig(cfg)
+	return c.tryGet(newCacheQueryFromConfig(cfg, refHash, filterHash, kind), kind)
 }
 
 func (c *VectorSearchCache) tryGet(query vectorCacheQuery, requiredKind SearchKind) (searchResult, bool) {
@@ -125,7 +137,7 @@ func (c *VectorSearchCache) tryGet(query vectorCacheQuery, requiredKind SearchKi
 			return result, true
 		}
 	}
-	if !query.IsRange {
+	if !query.IsRange && query.Kind != searchKindUnknown {
 		return searchResult{}, false
 	}
 
@@ -171,7 +183,7 @@ func (c *VectorSearchCache) Put(
 	result searchResult,
 	reqK int32,
 ) {
-	c.put(newKNNCacheQuery(modelName, refHash, filterHash, reqK), result)
+	c.put(newKNNCacheQuery(modelName, refHash, filterHash, reqK, result.Kind), result)
 }
 
 func (c *VectorSearchCache) PutForConfig(
@@ -180,7 +192,7 @@ func (c *VectorSearchCache) PutForConfig(
 	filterHash uint64,
 	result searchResult,
 ) {
-	c.put(newCacheQueryFromConfig(cfg, refHash, filterHash), result)
+	c.put(newCacheQueryFromConfig(cfg, refHash, filterHash, result.Kind), result)
 }
 
 func (c *VectorSearchCache) put(query vectorCacheQuery, result searchResult) {
@@ -266,21 +278,39 @@ func (c *VectorSearchCache) isExpired(entry *cacheEntry, now time.Time) bool {
 	return c.ttl > 0 && now.Sub(entry.CreatedAt) >= c.ttl
 }
 
-func newKNNCacheQuery(modelName string, refHash uint64, filterHash uint64, limit int32) vectorCacheQuery {
+func newKNNCacheQuery(
+	modelName string,
+	refHash uint64,
+	filterHash uint64,
+	limit int32,
+	kind SearchKind,
+) vectorCacheQuery {
 	return vectorCacheQuery{
 		ModelName:  strings.TrimSpace(modelName),
 		RefHash:    refHash,
 		FilterHash: filterHash,
 		Limit:      limit,
+		Kind:       kind,
 	}
 }
 
-func newCacheQueryFromConfig(cfg *pb.VectorSearchDimension, refHash uint64, filterHash uint64) vectorCacheQuery {
+func newCacheQueryFromConfig(
+	cfg *pb.VectorSearchDimension,
+	refHash uint64,
+	filterHash uint64,
+	kind SearchKind,
+) vectorCacheQuery {
 	if cfg == nil {
-		return vectorCacheQuery{RefHash: refHash, FilterHash: filterHash}
+		return vectorCacheQuery{RefHash: refHash, FilterHash: filterHash, Kind: kind}
 	}
 
-	query := newKNNCacheQuery(cfg.GetModelName(), refHash, filterHash, effectiveVectorMaxResults(cfg))
+	query := newKNNCacheQuery(
+		cfg.GetModelName(),
+		refHash,
+		filterHash,
+		effectiveVectorMaxResults(cfg),
+		kind,
+	)
 	if !isRangeQuery(cfg) {
 		return query
 	}
@@ -298,6 +328,7 @@ func newCacheKey(query vectorCacheQuery) cacheKey {
 		IsRange:    query.IsRange,
 		MinBits:    math.Float32bits(query.MinDistance),
 		MaxBits:    math.Float32bits(query.MaxDistance),
+		Kind:       query.Kind,
 	}
 }
 

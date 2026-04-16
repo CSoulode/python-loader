@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -252,6 +253,9 @@ func (s *DataLoaderServer) executeMetadataFilter(
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	sort.Slice(ids, func(i int, j int) bool {
+		return ids[i] < ids[j]
+	})
 	logBenchmarkEvent(ctx, "metadata_filter_done", map[string]any{
 		"candidate_count": len(ids),
 		"filter_count":    len(filters),

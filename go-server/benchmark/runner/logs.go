@@ -3,11 +3,19 @@ package runner
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
+	"time"
 )
 
 const benchmarkLogPrefix = "BENCH_METRIC "
+
+const (
+	benchEventRetryInterval = 25 * time.Millisecond
+	benchEventRetryTimeout  = 10 * time.Second
+	benchScannerBufferSize  = 1024 * 1024
+)
 
 type BenchEvent struct {
 	BenchID                string  `json:"bench_id"`
@@ -42,6 +50,7 @@ func ReadBenchEvents(path string, benchID string) ([]BenchEvent, error) {
 
 	events := make([]BenchEvent, 0)
 	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 0, 64*1024), benchScannerBufferSize)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if !strings.Contains(line, benchmarkLogPrefix) {
@@ -62,4 +71,21 @@ func ReadBenchEvents(path string, benchID string) ([]BenchEvent, error) {
 		return nil, err
 	}
 	return events, nil
+}
+
+func ReadBenchEventsUntil(path string, benchID string, ready func([]BenchEvent) bool) ([]BenchEvent, error) {
+	deadline := time.Now().Add(benchEventRetryTimeout)
+	for {
+		events, err := ReadBenchEvents(path, benchID)
+		if err != nil {
+			return nil, err
+		}
+		if ready == nil || ready(events) {
+			return events, nil
+		}
+		if time.Now().After(deadline) {
+			return events, fmt.Errorf("bench events not ready after %s: bench_id=%s events=%d", benchEventRetryTimeout, benchID, len(events))
+		}
+		time.Sleep(benchEventRetryInterval)
+	}
 }

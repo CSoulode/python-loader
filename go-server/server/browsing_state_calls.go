@@ -514,11 +514,45 @@ func ExecuteInitializeIdsPlan(ctx context.Context, db *sql.DB, plan *qg.Initiali
 func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesIncrementalGrouping(
 	req *pb.GetBrowsingStateRequest,
 	stream pb.DataLoader_GetBrowsingStateDistinctBranchesIncrementalGroupingServer,
-) error {
+) (retErr error) {
 	ctx := stream.Context()
+	ifNoneMatch := getGRPCIfNoneMatch(ctx)
+	prepared, cacheKey, cachedEntry, cacheHit, err := s.lookupBrowsingStateCache(
+		req,
+		bsCacheNamespaceDistinctBranchesIncrementalGrouping,
+	)
+	if err != nil {
+		return err
+	}
+	if cacheHit {
+		if matchIfNoneMatch(ifNoneMatch, cachedEntry.ETag) {
+			s.ensureBrowsingStateCache().RecordGRPCNotModified()
+			return sendBrowsingStateGRPCNotModified(stream, cachedEntry.ETag)
+		}
+		return sendBrowsingStateGRPCEntry(ctx, stream, cachedEntry)
+	}
+	if shouldCachePreparedBrowsingState(prepared) {
+		cacheWrite, err := s.newBrowsingStateCacheWrite(ctx, cacheKey, prepared)
+		if err != nil {
+			return err
+		}
+		recorder := newBrowsingStateCacheRecorder()
+		originalStream := stream
+		stream = newRecordingBrowsingStateStream(stream, recorder, false)
+		defer func() {
+			retErr = s.finalizeBrowsingStateGRPCResponse(
+				ctx,
+				originalStream,
+				cacheWrite,
+				recorder,
+				ifNoneMatch,
+				retErr,
+			)
+		}()
+	}
 
 	// ---------- Parse request params ----------
-	plan, err := s.parseBrowsingStateRequest(ctx, req)
+	plan, err := s.materializePreparedBrowsingStateRequest(ctx, prepared)
 	if err != nil {
 		return err
 	}
@@ -702,10 +736,45 @@ scanLoop:
 func (s *DataLoaderServer) GetBrowsingStateDistinctBranchesFull(
 	req *pb.GetBrowsingStateRequest,
 	stream pb.DataLoader_GetBrowsingStateDistinctBranchesFullServer,
-) error {
+) (retErr error) {
 	ctx := stream.Context()
+	ifNoneMatch := getGRPCIfNoneMatch(ctx)
+	prepared, cacheKey, cachedEntry, cacheHit, err := s.lookupBrowsingStateCache(
+		req,
+		bsCacheNamespaceDistinctBranchesFull,
+	)
+	if err != nil {
+		return err
+	}
+	if cacheHit {
+		if matchIfNoneMatch(ifNoneMatch, cachedEntry.ETag) {
+			s.ensureBrowsingStateCache().RecordGRPCNotModified()
+			return sendBrowsingStateGRPCNotModified(stream, cachedEntry.ETag)
+		}
+		return sendBrowsingStateGRPCEntry(ctx, stream, cachedEntry)
+	}
+	if shouldCachePreparedBrowsingState(prepared) {
+		cacheWrite, err := s.newBrowsingStateCacheWrite(ctx, cacheKey, prepared)
+		if err != nil {
+			return err
+		}
+		recorder := newBrowsingStateCacheRecorder()
+		originalStream := stream
+		stream = newRecordingBrowsingStateStream(stream, recorder, false)
+		defer func() {
+			retErr = s.finalizeBrowsingStateGRPCResponse(
+				ctx,
+				originalStream,
+				cacheWrite,
+				recorder,
+				ifNoneMatch,
+				retErr,
+			)
+		}()
+	}
+
 	// ---------- Parse request params ----------
-	plan, err := s.parseBrowsingStateRequest(ctx, req)
+	plan, err := s.materializePreparedBrowsingStateRequest(ctx, prepared)
 	if err != nil {
 		return err
 	}
@@ -931,10 +1000,44 @@ scanLoop:
 func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesSingles(
 	req *pb.GetBrowsingStateRequest,
 	stream pb.DataLoader_GetBrowsingStateNonDistinctBranchesSinglesServer,
-) error {
+) (retErr error) {
 	ctx := stream.Context()
+	ifNoneMatch := getGRPCIfNoneMatch(ctx)
+	prepared, cacheKey, cachedEntry, cacheHit, err := s.lookupBrowsingStateCache(
+		req,
+		bsCacheNamespaceNonDistinctBranchesSingles,
+	)
+	if err != nil {
+		return err
+	}
+	if cacheHit {
+		if matchIfNoneMatch(ifNoneMatch, cachedEntry.ETag) {
+			s.ensureBrowsingStateCache().RecordGRPCNotModified()
+			return sendBrowsingStateGRPCNotModified(stream, cachedEntry.ETag)
+		}
+		return sendBrowsingStateGRPCEntry(ctx, stream, cachedEntry)
+	}
+	if shouldCachePreparedBrowsingState(prepared) {
+		cacheWrite, err := s.newBrowsingStateCacheWrite(ctx, cacheKey, prepared)
+		if err != nil {
+			return err
+		}
+		recorder := newBrowsingStateCacheRecorder()
+		originalStream := stream
+		stream = newRecordingBrowsingStateStream(stream, recorder, false)
+		defer func() {
+			retErr = s.finalizeBrowsingStateGRPCResponse(
+				ctx,
+				originalStream,
+				cacheWrite,
+				recorder,
+				ifNoneMatch,
+				retErr,
+			)
+		}()
+	}
 
-	plan, err := s.parseBrowsingStateRequest(ctx, req)
+	plan, err := s.materializePreparedBrowsingStateRequest(ctx, prepared)
 	if err != nil {
 		return err
 	}
@@ -1089,15 +1192,49 @@ scanLoop:
 func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesDeduplicatedSingles(
 	req *pb.GetBrowsingStateRequest,
 	stream pb.DataLoader_GetBrowsingStateNonDistinctBranchesDeduplicatedSinglesServer,
-) error {
+) (retErr error) {
 	ctx := stream.Context()
+	ifNoneMatch := getGRPCIfNoneMatch(ctx)
+	prepared, cacheKey, cachedEntry, cacheHit, err := s.lookupBrowsingStateCache(
+		req,
+		bsCacheNamespaceNonDistinctBranchesDeduplicatedSingles,
+	)
+	if err != nil {
+		return err
+	}
+	if cacheHit {
+		if matchIfNoneMatch(ifNoneMatch, cachedEntry.ETag) {
+			s.ensureBrowsingStateCache().RecordGRPCNotModified()
+			return sendBrowsingStateGRPCNotModified(stream, cachedEntry.ETag)
+		}
+		return sendBrowsingStateGRPCEntry(ctx, stream, cachedEntry)
+	}
+	if shouldCachePreparedBrowsingState(prepared) {
+		cacheWrite, err := s.newBrowsingStateCacheWrite(ctx, cacheKey, prepared)
+		if err != nil {
+			return err
+		}
+		recorder := newBrowsingStateCacheRecorder()
+		originalStream := stream
+		stream = newRecordingBrowsingStateStream(stream, recorder, false)
+		defer func() {
+			retErr = s.finalizeBrowsingStateGRPCResponse(
+				ctx,
+				originalStream,
+				cacheWrite,
+				recorder,
+				ifNoneMatch,
+				retErr,
+			)
+		}()
+	}
 
 	// Toggle for experiments:
 	// - false: dedup in scan loop (likely faster, less queue traffic)
 	// - true:  dedup in sender goroutine (interesting for comparison / backpressure evidence)
 	dedupInSender := false
 
-	plan, err := s.parseBrowsingStateRequest(ctx, req)
+	plan, err := s.materializePreparedBrowsingStateRequest(ctx, prepared)
 	if err != nil {
 		return err
 	}
@@ -1329,11 +1466,45 @@ scanLoop:
 func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesFull(
 	req *pb.GetBrowsingStateRequest,
 	stream pb.DataLoader_GetBrowsingStateNonDistinctBranchesFullServer,
-) error {
+) (retErr error) {
 	ctx := stream.Context()
+	ifNoneMatch := getGRPCIfNoneMatch(ctx)
+	prepared, cacheKey, cachedEntry, cacheHit, err := s.lookupBrowsingStateCache(
+		req,
+		bsCacheNamespaceNonDistinctBranchesFull,
+	)
+	if err != nil {
+		return err
+	}
+	if cacheHit {
+		if matchIfNoneMatch(ifNoneMatch, cachedEntry.ETag) {
+			s.ensureBrowsingStateCache().RecordGRPCNotModified()
+			return sendBrowsingStateGRPCNotModified(stream, cachedEntry.ETag)
+		}
+		return sendBrowsingStateGRPCEntry(ctx, stream, cachedEntry)
+	}
+	if shouldCachePreparedBrowsingState(prepared) {
+		cacheWrite, err := s.newBrowsingStateCacheWrite(ctx, cacheKey, prepared)
+		if err != nil {
+			return err
+		}
+		recorder := newBrowsingStateCacheRecorder()
+		originalStream := stream
+		stream = newRecordingBrowsingStateStream(stream, recorder, false)
+		defer func() {
+			retErr = s.finalizeBrowsingStateGRPCResponse(
+				ctx,
+				originalStream,
+				cacheWrite,
+				recorder,
+				ifNoneMatch,
+				retErr,
+			)
+		}()
+	}
 
 	// ---------- Parse request params ----------
-	plan, err := s.parseBrowsingStateRequest(ctx, req)
+	plan, err := s.materializePreparedBrowsingStateRequest(ctx, prepared)
 	if err != nil {
 		return err
 	}
@@ -1562,10 +1733,44 @@ scanLoop:
 func (s *DataLoaderServer) GetBrowsingStateNonDistinctBranchesIncrementalGrouping(
 	req *pb.GetBrowsingStateRequest,
 	stream pb.DataLoader_GetBrowsingStateNonDistinctBranchesIncrementalGroupingServer,
-) error {
+) (retErr error) {
 	ctx := stream.Context()
+	ifNoneMatch := getGRPCIfNoneMatch(ctx)
+	prepared, cacheKey, cachedEntry, cacheHit, err := s.lookupBrowsingStateCache(
+		req,
+		bsCacheNamespaceNonDistinctBranchesIncrementalGrouping,
+	)
+	if err != nil {
+		return err
+	}
+	if cacheHit {
+		if matchIfNoneMatch(ifNoneMatch, cachedEntry.ETag) {
+			s.ensureBrowsingStateCache().RecordGRPCNotModified()
+			return sendBrowsingStateGRPCNotModified(stream, cachedEntry.ETag)
+		}
+		return sendBrowsingStateGRPCEntry(ctx, stream, cachedEntry)
+	}
+	if shouldCachePreparedBrowsingState(prepared) {
+		cacheWrite, err := s.newBrowsingStateCacheWrite(ctx, cacheKey, prepared)
+		if err != nil {
+			return err
+		}
+		recorder := newBrowsingStateCacheRecorder()
+		originalStream := stream
+		stream = newRecordingBrowsingStateStream(stream, recorder, false)
+		defer func() {
+			retErr = s.finalizeBrowsingStateGRPCResponse(
+				ctx,
+				originalStream,
+				cacheWrite,
+				recorder,
+				ifNoneMatch,
+				retErr,
+			)
+		}()
+	}
 
-	plan, err := s.parseBrowsingStateRequest(ctx, req)
+	plan, err := s.materializePreparedBrowsingStateRequest(ctx, prepared)
 	if err != nil {
 		return err
 	}
@@ -1750,9 +1955,45 @@ scanLoop:
 	return nil
 }
 
-func (s *DataLoaderServer) GetBrowsingState(req *pb.GetBrowsingStateRequest, stream pb.DataLoader_GetBrowsingStateServer) error {
+func (s *DataLoaderServer) GetBrowsingState(req *pb.GetBrowsingStateRequest, stream pb.DataLoader_GetBrowsingStateServer) (retErr error) {
+	ctx := stream.Context()
+	ifNoneMatch := getGRPCIfNoneMatch(ctx)
+	prepared, cacheKey, cachedEntry, cacheHit, err := s.lookupBrowsingStateCache(
+		req,
+		bsCacheNamespaceGetBrowsingState,
+	)
+	if err != nil {
+		return err
+	}
+	if cacheHit {
+		if matchIfNoneMatch(ifNoneMatch, cachedEntry.ETag) {
+			s.ensureBrowsingStateCache().RecordGRPCNotModified()
+			return sendBrowsingStateGRPCNotModified(stream, cachedEntry.ETag)
+		}
+		return sendBrowsingStateGRPCEntry(ctx, stream, cachedEntry)
+	}
+	if shouldCachePreparedBrowsingState(prepared) {
+		cacheWrite, err := s.newBrowsingStateCacheWrite(ctx, cacheKey, prepared)
+		if err != nil {
+			return err
+		}
+		recorder := newBrowsingStateCacheRecorder()
+		originalStream := stream
+		stream = newRecordingBrowsingStateStream(stream, recorder, false)
+		defer func() {
+			retErr = s.finalizeBrowsingStateGRPCResponse(
+				ctx,
+				originalStream,
+				cacheWrite,
+				recorder,
+				ifNoneMatch,
+				retErr,
+			)
+		}()
+	}
+
 	// ---------- Parse request params ----------
-	plan, err := s.parseBrowsingStateRequest(stream.Context(), req)
+	plan, err := s.materializePreparedBrowsingStateRequest(ctx, prepared)
 	if err != nil {
 		return err
 	}
@@ -1782,7 +2023,7 @@ func (s *DataLoaderServer) GetBrowsingState(req *pb.GetBrowsingStateRequest, str
 
 	if sqlStr != "" {
 		traceSQL("GetBrowsingState.exec(all/timeline)", formatSQLForLog("\n"+sqlStr, nil, sqlTraceMaxLtr))
-		rows, err := s.db.QueryContext(stream.Context(), sqlStr)
+		rows, err := s.db.QueryContext(ctx, sqlStr)
 		if err != nil {
 			return fmt.Errorf("GetBrowsingState failed to execute query: %w", err)
 		}
@@ -1816,7 +2057,7 @@ func (s *DataLoaderServer) GetBrowsingState(req *pb.GetBrowsingStateRequest, str
 	}
 
 	// ---------- Axis positions ----------
-	if err := initXYZAxes(stream.Context(), s.db, &axisX, &axisY, &axisZ, "GetBrowsingState(initAxes).exec"); err != nil {
+	if err := initXYZAxes(ctx, s.db, &axisX, &axisY, &axisZ, "GetBrowsingState(initAxes).exec"); err != nil {
 		return err
 	}
 
@@ -1829,7 +2070,7 @@ func (s *DataLoaderServer) GetBrowsingState(req *pb.GetBrowsingStateRequest, str
 		qg.StateQueryOpts{AxisSubqueries: plan.AxisSubqueries},
 	)
 	traceSQL("GetBrowsingState.exec(state)", formatSQLForLog("\n"+sqlStr, nil, sqlTraceMaxLtr))
-	rows, err := s.db.QueryContext(stream.Context(), sqlStr)
+	rows, err := s.db.QueryContext(ctx, sqlStr)
 	if err != nil {
 		return fmt.Errorf("GetBrowsingState query error: %w", err)
 	}
@@ -1874,11 +2115,45 @@ func (s *DataLoaderServer) GetBrowsingState(req *pb.GetBrowsingStateRequest, str
 	return nil
 }
 
-func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, stream pb.DataLoader_GetBrowsingState2Server) error {
+func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, stream pb.DataLoader_GetBrowsingState2Server) (retErr error) {
 	ctx := stream.Context()
+	ifNoneMatch := getGRPCIfNoneMatch(ctx)
+	prepared, cacheKey, cachedEntry, cacheHit, err := s.lookupBrowsingStateCache(
+		req,
+		bsCacheNamespaceGetBrowsingState2,
+	)
+	if err != nil {
+		return err
+	}
+	if cacheHit {
+		if matchIfNoneMatch(ifNoneMatch, cachedEntry.ETag) {
+			s.ensureBrowsingStateCache().RecordGRPCNotModified()
+			return sendBrowsingStateGRPCNotModified(stream, cachedEntry.ETag)
+		}
+		return sendBrowsingStateGRPCEntry(ctx, stream, cachedEntry)
+	}
+	if shouldCachePreparedBrowsingState(prepared) {
+		cacheWrite, err := s.newBrowsingStateCacheWrite(ctx, cacheKey, prepared)
+		if err != nil {
+			return err
+		}
+		recorder := newBrowsingStateCacheRecorder()
+		originalStream := stream
+		stream = newRecordingBrowsingStateStream(stream, recorder, false)
+		defer func() {
+			retErr = s.finalizeBrowsingStateGRPCResponse(
+				ctx,
+				originalStream,
+				cacheWrite,
+				recorder,
+				ifNoneMatch,
+				retErr,
+			)
+		}()
+	}
 
 	// ---------- Parse request params ----------
-	plan, err := s.parseBrowsingStateRequest(ctx, req)
+	plan, err := s.materializePreparedBrowsingStateRequest(ctx, prepared)
 	if err != nil {
 		return err
 	}

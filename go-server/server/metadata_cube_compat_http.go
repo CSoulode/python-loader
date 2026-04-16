@@ -908,32 +908,57 @@ func GetMetaDataCubeCompatCellHandler(server *DataLoaderServer) http.HandlerFunc
 			http.Error(w, vectorFilterHTTPMessage(err), mapVectorFilterHTTPStatus(err))
 			return
 		}
-		if vectorFilterCfg != nil {
-			vectorIDs, err := server.vectorFilters.ResolveObjectIDs(r.Context(), vectorFilterCfg)
+
+		rebucketOnly := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("rebucketOnly")), "true")
+		prepared := &preparedBrowsingStateRequest{
+			AxisOrder:        buildCompatAxisOrder(axisX, axisY, axisZ, filters),
+			AxisX:            axisX,
+			AxisY:            axisY,
+			AxisZ:            axisZ,
+			Filters:          filters,
+			VectorFilter:     vectorFilterCfg,
+			MergedVectorDims: mergedVectorDims,
+			ForcedStrategy:   Auto,
+			AllDefined:       strings.TrimSpace(req.All) != "",
+			TimelineDefined:  strings.TrimSpace(req.Timeline) != "",
+			RebucketOnly:     rebucketOnly,
+		}
+		if err := validatePreparedBrowsingStateRequest(prepared); err != nil {
+			http.Error(w, vectorFilterHTTPMessage(err), mapVectorFilterHTTPStatus(err))
+			return
+		}
+
+		var (
+			cacheKey    bsCacheStorageKey
+			cacheWrite  *bsCacheWrite
+			ifNoneMatch string
+			shouldUseL1 = shouldCachePreparedBrowsingState(prepared)
+		)
+		if shouldUseL1 {
+			cacheKey, err = computeBSCacheKey(bsCacheNamespaceHTTPCompatCell, prepared)
 			if err != nil {
 				http.Error(w, vectorFilterHTTPMessage(err), mapVectorFilterHTTPStatus(err))
 				return
 			}
-			filters = appendVectorObjectIDFilter(filters, vectorIDs, true)
+			ifNoneMatch = r.Header.Get(bsHTTPIfNoneMatchKey)
+			if entry, ok := server.ensureBrowsingStateCache().TryGetEntry(cacheKey); ok {
+				if matchIfNoneMatch(ifNoneMatch, entry.ETag) {
+					server.ensureBrowsingStateCache().RecordHTTPNotModified()
+					writeBSETagHeader(w, entry.ETag)
+					w.WriteHeader(http.StatusNotModified)
+					return
+				}
+				writeCachedCompatBrowsingStateResponse(w, entry)
+				return
+			}
+			cacheWrite, err = server.newBrowsingStateCacheWrite(r.Context(), cacheKey, prepared)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("cache dependency lookup failed: %v", err), http.StatusBadGateway)
+				return
+			}
 		}
 
-		rebucketOnly := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("rebucketOnly")), "true")
-		plan := &browsingStateRequestPlan{
-			AxisOrder: buildCompatAxisOrder(axisX, axisY, axisZ, filters),
-			AxisX:     axisX,
-			AxisY:     axisY,
-			AxisZ:     axisZ,
-			Filters:   filters,
-		}
-		plan, err = server.applyVectorDimensionsToPlan(
-			r.Context(),
-			plan,
-			mergedVectorDims,
-			strings.TrimSpace(req.All) != "",
-			strings.TrimSpace(req.Timeline) != "",
-			rebucketOnly,
-			Auto,
-		)
+		plan, err := server.materializePreparedBrowsingStateRequest(r.Context(), prepared)
 		if err != nil {
 			http.Error(w, vectorFilterHTTPMessage(err), mapVectorFilterHTTPStatus(err))
 			return
@@ -1035,6 +1060,22 @@ func GetMetaDataCubeCompatCellHandler(server *DataLoaderServer) http.HandlerFunc
 			return
 		}
 
+		if shouldUseL1 {
+			entry := server.writeBrowsingStateCacheEntry(cacheKey, bsCacheValue{
+				Cells:           cachedCellsFromCompatResponses(out),
+				BucketInfos:     cloneBucketInfos(plan.BucketInfos),
+				AxisBucketInfos: cloneAxisBucketInfos(plan.AxisBucketInfos),
+			}, cacheWrite)
+			if matchIfNoneMatch(ifNoneMatch, entry.ETag) {
+				server.ensureBrowsingStateCache().RecordHTTPNotModified()
+				writeBSETagHeader(w, entry.ETag)
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+			writeCachedCompatBrowsingStateResponse(w, entry)
+			return
+		}
+
 		if plan.UseAxisBucketInfos && len(plan.AxisBucketInfos) > 0 {
 			writeJSON(w, http.StatusOK, compatBrowsingStateEnvelope{
 				AxisBucketInfos: convertCompatAxisBucketInfos(plan.AxisBucketInfos),
@@ -1049,7 +1090,6 @@ func GetMetaDataCubeCompatCellHandler(server *DataLoaderServer) http.HandlerFunc
 			})
 			return
 		}
-
 		writeJSON(w, http.StatusOK, out)
 	}
 }

@@ -1,9 +1,12 @@
+import sys
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 from matplotlib.colors import ListedColormap
 
 from helpers import load_csv, save_current, save_figure
+from phase_f_plots import analyze_exp10, analyze_exp11
 from range_plots import analyze_exp8, analyze_exp9
 
 
@@ -224,8 +227,25 @@ def summarize_best_index(df: pd.DataFrame, order: list[str]) -> pd.DataFrame:
 
 
 def main() -> None:
-    for fn in [analyze_exp1, analyze_exp2, analyze_exp3, analyze_exp4, analyze_exp5, analyze_exp6, analyze_exp7, analyze_exp8, analyze_exp9]:
-        fn()
+    analyzers = {
+        "exp1": analyze_exp1,
+        "exp2": analyze_exp2,
+        "exp3": analyze_exp3,
+        "exp4": analyze_exp4,
+        "exp5": analyze_exp5,
+        "exp6": analyze_exp6,
+        "exp7": analyze_exp7,
+        "exp8": analyze_exp8,
+        "exp9": analyze_exp9,
+        "exp10": analyze_exp10,
+        "exp11": analyze_exp11,
+    }
+    selected = sys.argv[1:] or list(analyzers.keys())
+    for name in selected:
+        analyzer = analyzers.get(name)
+        if analyzer is None:
+            raise SystemExit(f"unsupported analysis target: {name}")
+        analyzer()
 
 
 if __name__ == "__main__":

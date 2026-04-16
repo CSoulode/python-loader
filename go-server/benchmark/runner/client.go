@@ -2,12 +2,10 @@ package runner
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/metadata"
 
 	pb "m3.dataloader/dataloader"
 )
@@ -32,28 +30,11 @@ func ExecuteSSBRequest(
 	benchID string,
 	req *pb.GetBrowsingStateRequest,
 ) ([]TimedResponse, error) {
-	md := metadata.Pairs("x-bench-id", benchID)
-	reqCtx := metadata.NewOutgoingContext(ctx, md)
-	stream, err := client.GetBrowsingStateNonDistinctBranchesIncrementalGrouping(reqCtx, req)
+	result, err := ExecuteSSBRequestWithOptions(ctx, client, req, ExecuteRequestOptions{
+		BenchID: benchID,
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	start := time.Now()
-	out := make([]TimedResponse, 0, 128)
-	for {
-		resp, err := stream.Recv()
-		if err != nil {
-			if isStreamEOF(err) {
-				return out, nil
-			}
-			return nil, fmt.Errorf("recv stream: %w", err)
-		}
-		now := time.Now()
-		out = append(out, TimedResponse{
-			Elapsed:   now.Sub(start),
-			Timestamp: now,
-			Response:  resp,
-		})
-	}
+	return result.Responses, nil
 }

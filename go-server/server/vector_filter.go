@@ -259,66 +259,26 @@ func (s *DataLoaderServer) parseBrowsingStateRequest(
 	ctx context.Context,
 	req *pb.GetBrowsingStateRequest,
 ) (*browsingStateRequestPlan, error) {
-	if err := rejectAxisLevelVectorFilters(req.GetFilters()); err != nil {
-		return nil, err
-	}
-	forcedStrategy, err := strategyFromProto(req.GetHybridStrategy())
+	prepared, err := prepareBrowsingStateRequest(req)
 	if err != nil {
 		return nil, err
 	}
-
-	axisOrder, axisX, axisY, axisZ, filters, err := parseAxesAndFilters(req)
-	if err != nil {
-		return nil, err
-	}
-	merged, err := mergeVectorDimensions(req)
-	if err != nil {
-		return nil, err
-	}
-	if err := validateVectorFilterAgainstDimensions(req.GetVectorFilter(), merged.Dims); err != nil {
-		return nil, err
-	}
-
-	vectorIDs, active, err := s.resolveRequestVectorFilter(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-
-	filters = appendVectorObjectIDFilter(filters, vectorIDs, active)
-	if active && !containsAxisOrder(axisOrder, "filter") {
-		axisOrder = append(axisOrder, "filter")
-	}
-
-	plan := &browsingStateRequestPlan{
-		AxisOrder: axisOrder,
-		AxisX:     axisX,
-		AxisY:     axisY,
-		AxisZ:     axisZ,
-		Filters:   filters,
-	}
-	return s.applyVectorDimensionsToPlan(
-		ctx,
-		plan,
-		merged,
-		strings.TrimSpace(req.GetAll()) != "",
-		strings.TrimSpace(req.GetTimeline()) != "",
-		req.GetRebucketOnly(),
-		forcedStrategy,
-	)
+	return s.materializePreparedBrowsingStateRequest(ctx, prepared)
 }
 
-func (s *DataLoaderServer) resolveRequestVectorFilter(
+func (s *DataLoaderServer) resolvePreparedVectorFilter(
 	ctx context.Context,
-	req *pb.GetBrowsingStateRequest,
+	vectorFilter *pb.VectorFilterConfig,
+	timelineDefined bool,
 ) ([]int, bool, error) {
-	if req.GetVectorFilter() == nil {
+	if vectorFilter == nil {
 		return nil, false, nil
 	}
-	if strings.TrimSpace(req.GetTimeline()) != "" {
+	if timelineDefined {
 		return nil, false, status.Error(codes.InvalidArgument, "vector_filter is not supported with timeline requests")
 	}
 
-	ids, err := s.vectorFilters.ResolveObjectIDs(ctx, req.GetVectorFilter())
+	ids, err := s.vectorFilters.ResolveObjectIDs(ctx, vectorFilter)
 	if err != nil {
 		return nil, false, err
 	}

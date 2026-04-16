@@ -103,7 +103,20 @@ func (s *DataLoaderServer) globalVectorSearchForHybrid(
 		}, effectiveCfg))
 		return result, nil
 	}
-	return s.searchNeighbors(ctx, effectiveCfg, inputs)
+	result, err := s.searchNeighbors(ctx, effectiveCfg, inputs)
+	if err != nil {
+		return searchResult{}, err
+	}
+	cache.PutForConfig(effectiveCfg, refHash, filterHash, result)
+	logBenchmarkEvent(ctx, "vector_cache_put", appendVectorQueryBenchmarkFields(map[string]any{
+		"model_name":   modelName,
+		"filter_hash":  filterHash,
+		"ref_hash":     refHash,
+		"req_k":        effectiveVectorMaxResults(effectiveCfg),
+		"search_kind":  result.Kind.String(),
+		"result_count": len(result.RawNeighbors),
+	}, effectiveCfg))
+	return result, nil
 }
 
 func intersectHybridNeighbors(result searchResult, candidateIDs []int32) searchResult {

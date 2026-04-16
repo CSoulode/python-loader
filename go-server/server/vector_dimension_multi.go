@@ -64,13 +64,7 @@ func (s *DataLoaderServer) resolveMultiVectorDimensions(
 		index := index
 		preparedDim := preparedDim
 		group.Go(func() error {
-			searchResult, err := s.executePreparedVectorSearch(groupCtx, preparedDim, candidateIDs)
-			if err != nil {
-				return formatMultiVectorError(index, preparedDim.Config, err)
-			}
-
-			s.ensureVectorCache().PutForConfig(preparedDim.Config, preparedDim.RefHash, preparedDim.FilterHash, searchResult)
-			bucketed, err := bucketSearchResult(preparedDim.Config, searchResult)
+			bucketed, err := s.resolvePreparedVectorDimension(groupCtx, preparedDim, candidateIDs)
 			if err != nil {
 				return formatMultiVectorError(index, preparedDim.Config, err)
 			}

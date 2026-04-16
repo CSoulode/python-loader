@@ -90,6 +90,7 @@ If `--output-root` is omitted, the tool derives a dataset-aware root name such a
   - `exp1`: strategy comparison for KNN plus range rows with `dist_min / dist_max`
   - `exp5`: index comparison for KNN plus range rows with `dist_min / dist_max`
   - `exp6`: records both generic `plan_used_index` and precise `plan_used_vector_ann_index`
+  - `exp7`: records the same ANN-usage fields and writes one `EXPLAIN ANALYZE` plan per `(index_type, precision, k)`
   - `exp8`: range matrix across model, index type, query type, width, and position
   - `exp9`: range + metadata filtering with `query_type`, `ttfb_ms`, `ttlb_ms`, and `selected_strategy`
 

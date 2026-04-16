@@ -168,7 +168,7 @@ func (r *BenchRunner) runRangeStrategyCases(
 		if err != nil {
 			return nil, err
 		}
-		sample, err := executeMeasuredStream(ctx, session, dataset, Experiment9, caseID+"-sample", 0, query.RequestForPlan(plan, item.strategy, false, DefaultBucketConfig()))
+		sample, err := executeMeasuredStreamAllowMissingEvents(ctx, session, dataset, Experiment9, caseID+"-sample", 0, query.RequestForPlan(plan, item.strategy, false, DefaultBucketConfig()))
 		if err != nil {
 			return nil, err
 		}
@@ -178,7 +178,7 @@ func (r *BenchRunner) runRangeStrategyCases(
 			FormatFloat(plan.DistanceMin()),
 			FormatFloat(plan.DistanceMax()),
 			item.name,
-			summary.Strategy,
+			resolvedSelectedStrategy(summary.Strategy, item.strategy),
 			fmt.Sprintf("%d", query.ActualCandidateCount),
 			fmt.Sprintf("%d", totalResponseCount(sample.Items)),
 			FormatFloat(summary.TTFB),

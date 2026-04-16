@@ -101,6 +101,77 @@ require_lines() {
   log "validated $path lines=$actual"
 }
 
+require_min_lines() {
+  local path=$1
+  local minimum=$2
+  require_file "$path"
+  local actual
+  actual=$(wc -l <"$path")
+  if [[ "$actual" -lt "$minimum" ]]; then
+    log "unexpected line count for $path: got $actual expected_at_least $minimum"
+    exit 1
+  fi
+  log "validated $path lines=$actual minimum=$minimum"
+}
+
+require_matching_exp3_shape() {
+  local main_path=$1
+  local audit_path=$2
+  require_file "$main_path"
+  require_file "$audit_path"
+  python3 - "$main_path" "$audit_path" <<'PY'
+import csv
+import sys
+from collections import Counter
+
+def load(path):
+    with open(path, newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    shape = Counter((row["query_id"], row["strategy"], row["batch_idx"]) for row in rows)
+    return rows, shape
+
+main_rows, main_shape = load(sys.argv[1])
+audit_rows, audit_shape = load(sys.argv[2])
+if len(main_rows) != len(audit_rows) or main_shape != audit_shape:
+    print("exp3 convergence shape mismatch", file=sys.stderr)
+    print(f"main_rows={len(main_rows)} audit_rows={len(audit_rows)}", file=sys.stderr)
+    print(f"main_only={sorted((main_shape - audit_shape).elements())[:10]}", file=sys.stderr)
+    print(f"audit_only={sorted((audit_shape - main_shape).elements())[:10]}", file=sys.stderr)
+    sys.exit(1)
+PY
+  log "validated exp3 convergence shape matches between main and audit"
+}
+
+require_exp9_selected_strategy() {
+  local path=$1
+  require_file "$path"
+  if ! awk -F, '
+    NR == 1 {
+      for (i = 1; i <= NF; i++) {
+        idx[$i] = i
+      }
+      next
+    }
+    $idx["strategy"] == "auto" {
+      total++
+      value = $idx["selected_strategy"]
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+      if (value == "") {
+        blank++
+      }
+    }
+    END {
+      if (total == 0 || blank > 0) {
+        exit 1
+      }
+    }
+  ' "$path"; then
+    log "exp9 auto selected_strategy validation failed for $path"
+    exit 1
+  fi
+  log "validated exp9 auto selected_strategy values in $path"
+}
+
 run_analysis() {
   local root=$1
   log "run analysis root=$root"
@@ -118,7 +189,7 @@ run_main_full() {
   require_lines "$MAIN_ROOT/raw/exp1_strategy_comparison.csv" 385
 
   run_bench "$MAIN_ROOT" exp3,exp4
-  require_file "$MAIN_ROOT/raw/exp3_ssb_convergence.csv"
+  require_lines "$MAIN_ROOT/raw/exp3_ssb_convergence.csv" 241
   require_file "$MAIN_ROOT/raw/exp4_cache_effect.csv"
 
   run_bench "$MAIN_ROOT" exp8
@@ -126,6 +197,7 @@ run_main_full() {
 
   run_bench "$MAIN_ROOT" exp9
   require_lines "$MAIN_ROOT/raw/exp9_range_filter_strategy.csv" 57
+  require_exp9_selected_strategy "$MAIN_ROOT/raw/exp9_range_filter_strategy.csv"
 
   run_bench "$MAIN_ROOT" exp5
   require_lines "$MAIN_ROOT/raw/exp5_index_comparison.csv" 769
@@ -147,7 +219,7 @@ run_audit_full() {
   require_lines "$AUDIT_ROOT/raw/exp1_strategy_comparison.csv" 385
 
   run_bench "$AUDIT_ROOT" exp3,exp4
-  require_file "$AUDIT_ROOT/raw/exp3_ssb_convergence.csv"
+  require_lines "$AUDIT_ROOT/raw/exp3_ssb_convergence.csv" 241
   require_file "$AUDIT_ROOT/raw/exp4_cache_effect.csv"
 
   run_bench "$AUDIT_ROOT" exp8
@@ -155,6 +227,7 @@ run_audit_full() {
 
   run_bench "$AUDIT_ROOT" exp9
   require_lines "$AUDIT_ROOT/raw/exp9_range_filter_strategy.csv" 57
+  require_exp9_selected_strategy "$AUDIT_ROOT/raw/exp9_range_filter_strategy.csv"
 
   run_bench "$AUDIT_ROOT" exp5
   require_lines "$AUDIT_ROOT/raw/exp5_index_comparison.csv" 769
@@ -175,6 +248,7 @@ main() {
   log "main and audit runs are executed sequentially, never concurrently"
   run_main_full
   run_audit_full
+  require_matching_exp3_shape "$MAIN_ROOT/raw/exp3_ssb_convergence.csv" "$AUDIT_ROOT/raw/exp3_ssb_convergence.csv"
   log "orchestrator completed successfully"
 }
 

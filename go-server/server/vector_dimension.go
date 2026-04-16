@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"sort"
 	"strings"
 	"time"
 
@@ -263,7 +264,12 @@ func bucketSearchResult(cfg *pb.VectorSearchDimension, result searchResult) (*ve
 	} else {
 		localCfg = applyMetricDefaults(localCfg, result.DistanceMetric, result.RawNeighbors)
 	}
-	filtered := filterNeighborsByRange(result.RawNeighbors, localCfg.DistanceMin, localCfg.DistanceMax, effectiveVectorMaxResults(cfg))
+	filtered := filterNeighborsByRange(
+		sortNeighborsStable(result.RawNeighbors),
+		localCfg.DistanceMin,
+		localCfg.DistanceMax,
+		effectiveVectorMaxResults(cfg),
+	)
 	boundaries, err := computeBucketBoundaries(localCfg, filtered)
 	if err != nil {
 		return nil, err
@@ -300,5 +306,19 @@ func neighborsFromProto(neighbors []*kvstorev1.Neighbor) []Neighbor {
 			Distance: float64(neighbor.GetDistance()),
 		})
 	}
-	return out
+	return sortNeighborsStable(out)
+}
+
+func sortNeighborsStable(neighbors []Neighbor) []Neighbor {
+	if len(neighbors) == 0 {
+		return nil
+	}
+	sorted := cloneNeighbors(neighbors)
+	sort.Slice(sorted, func(i int, j int) bool {
+		if sorted[i].Distance != sorted[j].Distance {
+			return sorted[i].Distance < sorted[j].Distance
+		}
+		return sorted[i].ObjectID < sorted[j].ObjectID
+	})
+	return sorted
 }

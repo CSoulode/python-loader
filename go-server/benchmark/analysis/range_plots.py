@@ -11,6 +11,14 @@ EXP8_INDEX_COLORS = ["#4C78A8", "#F58518", "#54A24B", "#9D755D"]
 EXP8_PATH_SHORT = {"knn_adapter": "adapter", "brute_force": "brute"}
 EXP9_STRATEGY_ORDER = ["post_filter", "pre_filter", "hybrid"]
 EXP9_STRATEGY_COLORS = ["#4C78A8", "#F58518", "#54A24B"]
+EXP9_STRATEGY_ALIASES = {
+    "post_filter": "post_filter",
+    "range_post": "post_filter",
+    "pre_filter": "pre_filter",
+    "range_pre": "pre_filter",
+    "hybrid": "hybrid",
+    "range_hybrid": "hybrid",
+}
 
 
 def _encode_categories(table: pd.DataFrame, order: list[str]) -> pd.DataFrame:
@@ -19,6 +27,10 @@ def _encode_categories(table: pd.DataFrame, order: list[str]) -> pd.DataFrame:
 
 def _format_selectivity_labels(values) -> list[str]:
     return [f"{float(value):.3f}" for value in values]
+
+
+def _normalize_exp9_strategy(value: str) -> str:
+    return EXP9_STRATEGY_ALIASES.get(str(value).strip().lower(), "")
 
 
 def _exp8_frame() -> pd.DataFrame | None:
@@ -106,7 +118,23 @@ def _exp9_frame() -> pd.DataFrame | None:
         frame["query_type"] = frame["range_type"]
     if "selected_strategy" not in frame.columns:
         frame["selected_strategy"] = frame["strategy"]
+    frame["strategy"] = frame["strategy"].astype(str).str.strip().str.lower()
+    frame["selected_strategy"] = frame["selected_strategy"].astype(str).map(_normalize_exp9_strategy)
+    forced_mask = frame["strategy"] != "auto"
+    frame.loc[forced_mask & frame["selected_strategy"].eq(""), "selected_strategy"] = frame.loc[forced_mask, "strategy"].map(_normalize_exp9_strategy)
     return frame
+
+
+def _best_non_auto_strategies(df: pd.DataFrame) -> pd.DataFrame:
+    fallback = (
+        df[df["strategy"] != "auto"]
+        .sort_values("ttlb_ms")
+        .groupby(["query_type", "selectivity"], as_index=False)
+        .first()[["query_type", "selectivity", "strategy"]]
+        .copy()
+    )
+    fallback["selected_strategy"] = fallback["strategy"].map(_normalize_exp9_strategy)
+    return fallback[["query_type", "selectivity", "selected_strategy"]]
 
 
 def analyze_exp9() -> None:
@@ -132,9 +160,17 @@ def analyze_exp9() -> None:
 
     auto_rows = df[df["strategy"] == "auto"].copy()
     if auto_rows.empty:
-        auto_rows = df[df["strategy"] != "auto"].sort_values("ttlb_ms").groupby(["query_type", "selectivity"], as_index=False).first()
-        auto_rows["selected_strategy"] = auto_rows["strategy"]
+        auto_rows = _best_non_auto_strategies(df)
+    else:
+        fallback = _best_non_auto_strategies(df)
+        auto_rows = auto_rows.merge(fallback, on=["query_type", "selectivity"], how="left", suffixes=("", "_fallback"))
+        missing_mask = auto_rows["selected_strategy"].eq("")
+        auto_rows.loc[missing_mask, "selected_strategy"] = auto_rows.loc[missing_mask, "selected_strategy_fallback"]
+        auto_rows = auto_rows.drop(columns=["selected_strategy_fallback"])
     labels = auto_rows.pivot_table(index="query_type", columns="selectivity", values="selected_strategy", aggfunc="first")
+    labels = labels.dropna(axis=0, how="all").dropna(axis=1, how="all")
+    if labels.empty:
+        return
     labels.columns = _format_selectivity_labels(labels.columns)
     encoded = _encode_categories(labels, EXP9_STRATEGY_ORDER)
     plt.figure(figsize=(8, 3.8))

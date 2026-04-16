@@ -112,15 +112,17 @@ func (c DatasetCatalog) Config(id DatasetID) (DatasetConfig, error) {
 type ExperimentID string
 
 const (
-	Experiment1 ExperimentID = "exp1"
-	Experiment2 ExperimentID = "exp2"
-	Experiment3 ExperimentID = "exp3"
-	Experiment4 ExperimentID = "exp4"
-	Experiment5 ExperimentID = "exp5"
-	Experiment6 ExperimentID = "exp6"
-	Experiment7 ExperimentID = "exp7"
-	Experiment8 ExperimentID = "exp8"
-	Experiment9 ExperimentID = "exp9"
+	Experiment1  ExperimentID = "exp1"
+	Experiment2  ExperimentID = "exp2"
+	Experiment3  ExperimentID = "exp3"
+	Experiment4  ExperimentID = "exp4"
+	Experiment5  ExperimentID = "exp5"
+	Experiment6  ExperimentID = "exp6"
+	Experiment7  ExperimentID = "exp7"
+	Experiment8  ExperimentID = "exp8"
+	Experiment9  ExperimentID = "exp9"
+	Experiment10 ExperimentID = "exp10"
+	Experiment11 ExperimentID = "exp11"
 )
 
 type Options struct {
@@ -211,7 +213,7 @@ func ParseExperiments(value string) ([]ExperimentID, error) {
 	out := make([]ExperimentID, 0, len(items))
 	for _, item := range items {
 		switch ExperimentID(item) {
-		case Experiment1, Experiment2, Experiment3, Experiment4, Experiment5, Experiment6, Experiment7, Experiment8, Experiment9:
+		case Experiment1, Experiment2, Experiment3, Experiment4, Experiment5, Experiment6, Experiment7, Experiment8, Experiment9, Experiment10, Experiment11:
 			out = append(out, ExperimentID(item))
 		default:
 			return nil, fmt.Errorf("unsupported experiment %q", item)
@@ -234,6 +236,8 @@ func orderedExperiments() []ExperimentID {
 		Experiment5,
 		Experiment6,
 		Experiment7,
+		Experiment10,
+		Experiment11,
 	}
 }
 

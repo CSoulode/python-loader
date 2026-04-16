@@ -40,7 +40,7 @@ func run() error {
 		modelsFile       string
 		keepServices     bool
 	)
-	flag.StringVar(&experimentsValue, "experiments", "", "comma-separated experiment ids: exp1..exp9")
+	flag.StringVar(&experimentsValue, "experiments", "", "comma-separated experiment ids: exp1..exp11")
 	flag.StringVar(&datasetsValue, "datasets", "", "comma-separated dataset labels from --dataset-config (defaults: 182k,725k)")
 	flag.StringVar(&datasetConfig, "dataset-config", "", "comma-separated dataset specs: label:size:dsn_env")
 	flag.StringVar(&outputRoot, "output-root", "", "output root for the generated experiment tree (defaults to a dataset-aware future_experiment_framework_* path)")
