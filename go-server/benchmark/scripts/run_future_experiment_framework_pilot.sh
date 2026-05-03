@@ -18,6 +18,8 @@ GO_SERVER_ENV_FILE="${GO_SERVER_ENV_FILE:-/tmp/go-server.future-experiment-frame
 MAIN_ROOT="${MAIN_ROOT:-$BASE_OUTPUT_DIR/future_experiment_framework_${DATASET_LABEL}_${DATE_TAG}}"
 AUDIT_ROOT="${AUDIT_ROOT:-$BASE_OUTPUT_DIR/future_experiment_framework_${DATASET_LABEL}_audit_${DATE_TAG}}"
 LOG_PATH="${LOG_PATH:-$MAIN_ROOT/logs/pilot-orchestrator.log}"
+VALIDATOR="${VALIDATOR:-$GO_SERVER_DIR/benchmark/scripts/validate_future_experiment_framework.py}"
+DOC_WRITER="${DOC_WRITER:-$GO_SERVER_DIR/benchmark/scripts/write_future_experiment_docs.py}"
 
 if [[ -z "${!DATASET_DSN_ENV:-}" ]]; then
   printf 'missing required DSN env: %s\n' "$DATASET_DSN_ENV" >&2
@@ -101,6 +103,42 @@ require_lines() {
   log "validated $path lines=$actual"
 }
 
+require_matching_exp3_shape() {
+  local main_path=$1
+  local audit_path=$2
+  require_file "$main_path"
+  require_file "$audit_path"
+  python3 "$VALIDATOR" exp3-shape "$main_path" "$audit_path"
+  log "validated exp3 convergence shape matches between main and audit"
+}
+
+write_final_docs() {
+  python3 "$DOC_WRITER" --root "$MAIN_ROOT" --pair "$AUDIT_ROOT" --role main --dataset "$DATASET_LABEL"
+  python3 "$DOC_WRITER" --root "$AUDIT_ROOT" --pair "$MAIN_ROOT" --role audit --dataset "$DATASET_LABEL"
+  log "updated final run docs for main and audit roots"
+}
+
+require_exp9_selected_strategy() {
+  local path=$1
+  require_file "$path"
+  python3 "$VALIDATOR" exp9-selected-strategy "$path"
+  log "validated exp9 auto selected_strategy values in $path"
+}
+
+require_phase_f_perf() {
+  local path=$1
+  require_lines "$path" 69
+  python3 "$VALIDATOR" phase-f-perf "$path"
+  log "validated phase F exp10 perf gates in $path"
+}
+
+require_phase_f_invalidation() {
+  local path=$1
+  require_lines "$path" 5
+  python3 "$VALIDATOR" phase-f-invalidation "$path"
+  log "validated phase F exp11 invalidation gates in $path"
+}
+
 run_analysis() {
   local root=$1
   log "run analysis root=$root"
@@ -118,7 +156,7 @@ run_main_full() {
   require_lines "$MAIN_ROOT/raw/exp1_strategy_comparison.csv" 385
 
   run_bench "$MAIN_ROOT" exp3,exp4
-  require_file "$MAIN_ROOT/raw/exp3_ssb_convergence.csv"
+  require_lines "$MAIN_ROOT/raw/exp3_ssb_convergence.csv" 241
   require_file "$MAIN_ROOT/raw/exp4_cache_effect.csv"
 
   run_bench "$MAIN_ROOT" exp8
@@ -126,6 +164,7 @@ run_main_full() {
 
   run_bench "$MAIN_ROOT" exp9
   require_lines "$MAIN_ROOT/raw/exp9_range_filter_strategy.csv" 57
+  require_exp9_selected_strategy "$MAIN_ROOT/raw/exp9_range_filter_strategy.csv"
 
   run_bench "$MAIN_ROOT" exp5
   require_lines "$MAIN_ROOT/raw/exp5_index_comparison.csv" 769
@@ -136,18 +175,22 @@ run_main_full() {
   run_bench "$MAIN_ROOT" exp7
   require_lines "$MAIN_ROOT/raw/exp7_half_precision.csv" 13
 
+  run_bench "$MAIN_ROOT" exp10,exp11
+  require_phase_f_perf "$MAIN_ROOT/raw/exp_f_chain_perf.csv"
+  require_phase_f_invalidation "$MAIN_ROOT/raw/exp_f_chain_invalidation.csv"
+
   run_analysis "$MAIN_ROOT"
 }
 
 run_audit_full() {
   run_bench "$AUDIT_ROOT" exp2
-  require_file "$AUDIT_ROOT/raw/exp2_selectivity_accuracy.csv"
+  require_lines "$AUDIT_ROOT/raw/exp2_selectivity_accuracy.csv" 57
 
   run_bench "$AUDIT_ROOT" exp1
   require_lines "$AUDIT_ROOT/raw/exp1_strategy_comparison.csv" 385
 
   run_bench "$AUDIT_ROOT" exp3,exp4
-  require_file "$AUDIT_ROOT/raw/exp3_ssb_convergence.csv"
+  require_lines "$AUDIT_ROOT/raw/exp3_ssb_convergence.csv" 241
   require_file "$AUDIT_ROOT/raw/exp4_cache_effect.csv"
 
   run_bench "$AUDIT_ROOT" exp8
@@ -155,6 +198,7 @@ run_audit_full() {
 
   run_bench "$AUDIT_ROOT" exp9
   require_lines "$AUDIT_ROOT/raw/exp9_range_filter_strategy.csv" 57
+  require_exp9_selected_strategy "$AUDIT_ROOT/raw/exp9_range_filter_strategy.csv"
 
   run_bench "$AUDIT_ROOT" exp5
   require_lines "$AUDIT_ROOT/raw/exp5_index_comparison.csv" 769
@@ -164,6 +208,10 @@ run_audit_full() {
 
   run_bench "$AUDIT_ROOT" exp7
   require_lines "$AUDIT_ROOT/raw/exp7_half_precision.csv" 13
+
+  run_bench "$AUDIT_ROOT" exp10,exp11
+  require_phase_f_perf "$AUDIT_ROOT/raw/exp_f_chain_perf.csv"
+  require_phase_f_invalidation "$AUDIT_ROOT/raw/exp_f_chain_invalidation.csv"
 
   run_analysis "$AUDIT_ROOT"
 }
@@ -175,6 +223,8 @@ main() {
   log "main and audit runs are executed sequentially, never concurrently"
   run_main_full
   run_audit_full
+  require_matching_exp3_shape "$MAIN_ROOT/raw/exp3_ssb_convergence.csv" "$AUDIT_ROOT/raw/exp3_ssb_convergence.csv"
+  write_final_docs
   log "orchestrator completed successfully"
 }
 

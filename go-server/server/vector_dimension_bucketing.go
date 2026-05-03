@@ -8,6 +8,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	pb "m3.dataloader/dataloader"
 )
@@ -359,8 +360,10 @@ func cloneBucketInfos(infos []*pb.BucketInfo) []*pb.BucketInfo {
 		if info == nil {
 			continue
 		}
-		copyInfo := *info
-		cloned = append(cloned, &copyInfo)
+		copyInfo, ok := proto.Clone(info).(*pb.BucketInfo)
+		if ok {
+			cloned = append(cloned, copyInfo)
+		}
 	}
 	return cloned
 }

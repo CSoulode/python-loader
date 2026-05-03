@@ -133,6 +133,9 @@ func (s *DataLoaderServer) CreateTagging(ctx context.Context, request *pb.Create
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to insert tagging into database: %s", err)
 	}
+	if err := s.invalidateBrowsingStateTag(ctx, request.TagId); err != nil {
+		return nil, status.Errorf(codes.Internal, "Failed to invalidate browsing state cache: %s", err)
+	}
 
 	return &insertedTagging, nil
 }
@@ -142,6 +145,7 @@ func (s *DataLoaderServer) CreateTaggingStream(stream pb.DataLoader_CreateTaggin
 	requestCounter, dataCounter := 0, 1
 	var queryString string
 	var data []interface{}
+	var batchTagIDs []int64
 
 	for {
 		request, err := stream.Recv()
@@ -157,6 +161,7 @@ func (s *DataLoaderServer) CreateTaggingStream(stream pb.DataLoader_CreateTaggin
 		if requestCounter%BATCH_SIZE == 1 {
 			queryString = "INSERT INTO public.taggings (object_id, tag_id) VALUES "
 			data = []interface{}{}
+			batchTagIDs = []int64{}
 		}
 
 		queryString += fmt.Sprintf("($%d, $%d),", dataCounter, dataCounter+1)
@@ -164,6 +169,7 @@ func (s *DataLoaderServer) CreateTaggingStream(stream pb.DataLoader_CreateTaggin
 			request.MediaId,
 			request.TagId,
 		)
+		batchTagIDs = append(batchTagIDs, request.TagId)
 		dataCounter += 2
 
 		if requestCounter%BATCH_SIZE == 0 {
@@ -182,6 +188,9 @@ func (s *DataLoaderServer) CreateTaggingStream(stream pb.DataLoader_CreateTaggin
 				continue
 			}
 			rowsAffected, _ := res.RowsAffected()
+			if err := s.invalidateBrowsingStateTags(stream.Context(), batchTagIDs); err != nil {
+				return fmt.Errorf("failed to invalidate browsing state cache: %w", err)
+			}
 			if err = stream.Send(&pb.CreateTaggingStreamResponse{
 				Message: &pb.CreateTaggingStreamResponse_Count{
 					Count: int64(rowsAffected),
@@ -207,6 +216,9 @@ func (s *DataLoaderServer) CreateTaggingStream(stream pb.DataLoader_CreateTaggin
 			return nil
 		}
 		rowsAffected, _ := res.RowsAffected()
+		if err := s.invalidateBrowsingStateTags(stream.Context(), batchTagIDs); err != nil {
+			return fmt.Errorf("failed to invalidate browsing state cache: %w", err)
+		}
 		if err = stream.Send(&pb.CreateTaggingStreamResponse{
 			Message: &pb.CreateTaggingStreamResponse_Count{
 				Count: int64(rowsAffected),
@@ -328,6 +340,8 @@ func (s *DataLoaderServer) ChangeTagging(ctx context.Context, request *pb.Change
 	}
 
 	rmq.PublishMessage(prod, body, fmt.Sprintf("tagging_update.%s", tagsetName))
+	s.invalidateBrowsingStateTagAndTagset(request.TagId, request.TagSetId)
+	s.invalidateBrowsingStateTagAndTagset(tag.Id, tag.TagSetId)
 
 	return &pb.Empty{}, nil
 }

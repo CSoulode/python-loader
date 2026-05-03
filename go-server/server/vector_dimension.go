@@ -128,16 +128,18 @@ func (s *DataLoaderServer) listVectorModels(ctx context.Context) (*kvstorev1.Lis
 }
 
 func (s *DataLoaderServer) resolveModelInfo(ctx context.Context, modelName string) (*kvstorev1.ModelInfo, error) {
+	want := strings.TrimSpace(modelName)
+	if cached, ok := s.ensureModelInfoCache().get(want); ok {
+		return cached, nil
+	}
 	resp, err := s.listVectorModels(ctx)
 	if err != nil {
 		return nil, err
 	}
+	s.ensureModelInfoCache().putAll(resp.GetModels())
 
-	want := strings.TrimSpace(modelName)
-	for _, model := range resp.GetModels() {
-		if strings.TrimSpace(model.GetName()) == want {
-			return model, nil
-		}
+	if cached, ok := s.ensureModelInfoCache().get(want); ok {
+		return cached, nil
 	}
 	return nil, status.Errorf(codes.NotFound, "vector_dimension model %q not found", want)
 }

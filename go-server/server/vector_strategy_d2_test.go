@@ -47,6 +47,31 @@ func TestStrategyFromProtoRejectsUnknownValue(t *testing.T) {
 	}
 }
 
+func TestParseCompatHybridStrategy(t *testing.T) {
+	tests := map[string]HybridStrategy{
+		"":            Auto,
+		"auto":        Auto,
+		"post_filter": PostFilter,
+		"pre-filter":  PreFilter,
+		"hybrid":      Hybrid,
+	}
+	for raw, want := range tests {
+		got, err := parseCompatHybridStrategy(raw)
+		if err != nil {
+			t.Fatalf("parse %q: %v", raw, err)
+		}
+		if got != want {
+			t.Fatalf("parse %q = %s, want %s", raw, got, want)
+		}
+	}
+}
+
+func TestParseCompatHybridStrategyRejectsUnknownValue(t *testing.T) {
+	if _, err := parseCompatHybridStrategy("bad"); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("error code = %s, want InvalidArgument", status.Code(err))
+	}
+}
+
 func TestVectorSearchCacheTryGetGlobalKNNRejectsFilteredEntry(t *testing.T) {
 	cache := newVectorSearchCache(2, defaultVectorCacheTTL)
 	cache.Put("siglip2", 1, 2, searchResult{
@@ -56,6 +81,30 @@ func TestVectorSearchCacheTryGetGlobalKNNRejectsFilteredEntry(t *testing.T) {
 
 	if _, ok := cache.TryGetGlobalKNN("siglip2", 1, 2, 1); ok {
 		t.Fatal("expected global-only lookup to miss filtered entry")
+	}
+}
+
+func TestVectorSearchCacheStoresSearchKindsSeparately(t *testing.T) {
+	cache := newVectorSearchCache(4, defaultVectorCacheTTL)
+	cfg := &pb.VectorSearchDimension{ModelName: "siglip2", MaxResults: 10}
+	cache.PutForConfig(cfg, 1, 2, searchResult{
+		RawNeighbors:   []Neighbor{{ObjectID: 1}},
+		DistanceMetric: "cosine",
+		Kind:           searchKindGlobalKNN,
+	})
+	cache.PutForConfig(cfg, 1, 2, searchResult{
+		RawNeighbors:   []Neighbor{{ObjectID: 2}},
+		DistanceMetric: "cosine",
+		Kind:           searchKindFilteredKNN,
+	})
+
+	global, ok := cache.TryGetForConfigKind(cfg, 1, 2, searchKindGlobalKNN)
+	if !ok || global.RawNeighbors[0].ObjectID != 1 {
+		t.Fatalf("global cache result = %+v hit=%v", global.RawNeighbors, ok)
+	}
+	filtered, ok := cache.TryGetForConfigKind(cfg, 1, 2, searchKindFilteredKNN)
+	if !ok || filtered.RawNeighbors[0].ObjectID != 2 {
+		t.Fatalf("filtered cache result = %+v hit=%v", filtered.RawNeighbors, ok)
 	}
 }
 

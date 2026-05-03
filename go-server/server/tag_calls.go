@@ -275,8 +275,8 @@ LEFT JOIN
 }
 
 func (s *DataLoaderServer) CreateTag(ctx context.Context, request *pb.CreateTagRequest) (*pb.Tag, error) {
-	queryString := `SELECT t.id, t.tagtype_id, t.tagset_id, a.name::text as value 
-FROM 
+	queryString := `SELECT t.id, t.tagtype_id, t.tagset_id, a.name::text as value
+FROM
     (SELECT * FROM public.tags WHERE tagset_id = $1 AND tagtype_id = $2) t
     LEFT JOIN `
 	data := []interface{}{}
@@ -372,12 +372,12 @@ FROM
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Failed to insert tag into database: %s", err)
 		}
-		return &pb.Tag{
+		return s.createdTagResponse(&pb.Tag{
 			Id:        insertedId,
 			TagSetId:  request.TagSetId,
 			TagTypeId: request.TagTypeId,
 			Value:     &pb.Tag_Alphanumerical{Alphanumerical: &pb.AlphanumericalValue{Value: value}},
-		}, nil
+		}), nil
 	case 2:
 		var value string
 		queryString += "timestamp_tags (id, name, tagset_id) VALUES ($1, $2, $3) RETURNING name::text"
@@ -386,12 +386,12 @@ FROM
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Failed to insert tag into database: %s", err)
 		}
-		return &pb.Tag{
+		return s.createdTagResponse(&pb.Tag{
 			Id:        insertedId,
 			TagSetId:  request.TagSetId,
 			TagTypeId: request.TagTypeId,
 			Value:     &pb.Tag_Timestamp{Timestamp: &pb.TimeStampValue{Value: value}},
-		}, nil
+		}), nil
 	case 3:
 		var value string
 		queryString += "time_tags (id, name, tagset_id) VALUES ($1, $2, $3) RETURNING name::text"
@@ -400,12 +400,12 @@ FROM
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Failed to insert tag into database: %s", err)
 		}
-		return &pb.Tag{
+		return s.createdTagResponse(&pb.Tag{
 			Id:        insertedId,
 			TagSetId:  request.TagSetId,
 			TagTypeId: request.TagTypeId,
 			Value:     &pb.Tag_Time{Time: &pb.TimeValue{Value: value}},
-		}, nil
+		}), nil
 	case 4:
 		var value string
 		queryString += "date_tags (id, name, tagset_id) VALUES ($1, $2, $3) RETURNING name::text"
@@ -414,12 +414,12 @@ FROM
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Failed to insert tag into database: %s", err)
 		}
-		return &pb.Tag{
+		return s.createdTagResponse(&pb.Tag{
 			Id:        insertedId,
 			TagSetId:  request.TagSetId,
 			TagTypeId: request.TagTypeId,
 			Value:     &pb.Tag_Date{Date: &pb.DateValue{Value: value}},
-		}, nil
+		}), nil
 	case 5:
 		var value int64
 		queryString += "numerical_tags (id, name, tagset_id) VALUES ($1, $2, $3) RETURNING name"
@@ -428,12 +428,12 @@ FROM
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Failed to insert tag into database: %s", err)
 		}
-		return &pb.Tag{
+		return s.createdTagResponse(&pb.Tag{
 			Id:        insertedId,
 			TagSetId:  request.TagSetId,
 			TagTypeId: request.TagTypeId,
 			Value:     &pb.Tag_Numerical{Numerical: &pb.NumericalValue{Value: value}},
-		}, nil
+		}), nil
 	default:
 		return nil, status.Errorf(codes.InvalidArgument, "Invalid tag type provided: range is 1-5")
 	}
@@ -519,6 +519,7 @@ func (s *DataLoaderServer) ChangeTagName(ctx context.Context, request *pb.Change
 	}
 
 	rmq.PublishMessage(prod, body, fmt.Sprintf("tag_update.%s", tagsetName))
+	s.invalidateBrowsingStateTagAndTagset(request.TagId, request.TagSetId)
 
 	return &pb.Empty{}, nil
 }

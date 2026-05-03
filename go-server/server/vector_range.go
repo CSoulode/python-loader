@@ -5,6 +5,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	pb "m3.dataloader/dataloader"
 )
@@ -118,18 +119,11 @@ func cloneVectorSearchConfig(cfg *pb.VectorSearchDimension) *pb.VectorSearchDime
 	if cfg == nil {
 		return nil
 	}
-
-	cloned := *cfg
-	if bucketCfg := cfg.GetBucketCfg(); bucketCfg != nil {
-		bucketCopy := *bucketCfg
-		bucketCopy.CustomBreaks = append([]float32(nil), bucketCfg.GetCustomBreaks()...)
-		cloned.BucketCfg = &bucketCopy
+	cloned, ok := proto.Clone(cfg).(*pb.VectorSearchDimension)
+	if !ok {
+		return nil
 	}
-	if distanceRange := cfg.GetDistanceRange(); distanceRange != nil {
-		rangeCopy := *distanceRange
-		cloned.DistanceRange = &rangeCopy
-	}
-	return &cloned
+	return cloned
 }
 
 func vectorDistanceRange(cfg *pb.VectorSearchDimension) (float64, float64, bool) {

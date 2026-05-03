@@ -106,6 +106,7 @@ func (s *DataLoaderServer) GetNodes(request *pb.GetNodesRequest, stream pb.DataL
 	return nil
 }
 func (s *DataLoaderServer) CreateNode(ctx context.Context, request *pb.CreateNodeRequest) (*pb.Node, error) {
+	created := false
 	// If we are trying to add a rootnode, the operations are a bit different
 	// First, check if node already exists
 	queryString := "SELECT * FROM public.nodes WHERE tag_id = $1 AND hierarchy_id = $2"
@@ -136,6 +137,7 @@ func (s *DataLoaderServer) CreateNode(ctx context.Context, request *pb.CreateNod
 			if _, err := result.RowsAffected(); err != nil {
 				return nil, status.Errorf(codes.Internal, "Failed to update rootnode of hierarchy: %s", err)
 			}
+			created = true
 		} else if existingParentnode.Valid {
 			return nil, status.Errorf(codes.AlreadyExists, "Node already present in hierarchy with a different parent node.")
 		}
@@ -148,12 +150,16 @@ func (s *DataLoaderServer) CreateNode(ctx context.Context, request *pb.CreateNod
 			if err != nil && err != sql.ErrNoRows {
 				return nil, status.Errorf(codes.Internal, "Failed to insert node into database: %s", err)
 			}
+			created = true
 		} else if !existingParentnode.Valid || existingParentnode.Int64 != request.ParentNodeId {
 			return nil, status.Errorf(codes.AlreadyExists, "Node already present in hierarchy with a different parent node.")
 		} else {
 			newNode.ParentNodeId = existingParentnode.Int64
 		}
 
+	}
+	if created {
+		s.invalidateBrowsingStateNode(&newNode)
 	}
 	return &newNode, nil
 }

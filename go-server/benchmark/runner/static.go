@@ -116,13 +116,12 @@ func (r *BenchRunner) summaryTemplate() string {
 - Run tree: `+"`%s`"+`
 - Dataset scope: %s
 - Experiment scope: %s
-- Status: pending execution
+- Status: initialized
 
-## To Fill
+## Notes
 
-- Which experiments completed
-- Main findings and anomalies
-- Whether any anomaly traced to benchmark code, chain code, or environment
+- The pilot orchestrator rewrites this file after all exp1-exp11 main and audit gates pass.
+- If this scaffold remains, the run did not reach final documentation generation.
 `, r.paths.Root, joinDatasetLabels(r.opts.Datasets), joinExperimentLabels(r.opts.Experiments))
 }
 

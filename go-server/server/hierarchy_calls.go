@@ -110,6 +110,10 @@ func (s *DataLoaderServer) CreateHierarchy(ctx context.Context, request *pb.Crea
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to insert hierarchy into database: %s", err)
 	}
+	s.invalidateBrowsingStateDependencies(browsingStateDependency{
+		Kind: browsingStateDepTagset,
+		ID:   fmt.Sprint(insertedHierarchy.TagSetId),
+	})
 
 	return &insertedHierarchy, nil
 }

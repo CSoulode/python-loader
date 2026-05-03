@@ -57,3 +57,56 @@ func ExecuteSSBRequest(
 		})
 	}
 }
+
+type BrowsingState2Result struct {
+	Elapsed      time.Duration
+	Responses    []*pb.BrowsingStateResponse
+	Header       metadata.MD
+	Trailer      metadata.MD
+	PayloadBytes int
+}
+
+func ExecuteBrowsingState2Request(
+	ctx context.Context,
+	client pb.DataLoaderClient,
+	benchID string,
+	req *pb.GetBrowsingStateRequest,
+	md metadata.MD,
+) (*BrowsingState2Result, error) {
+	outgoing := metadata.Join(metadata.Pairs("x-bench-id", benchID), md)
+	reqCtx := metadata.NewOutgoingContext(ctx, outgoing)
+	var header metadata.MD
+	var trailer metadata.MD
+	start := time.Now()
+	stream, err := client.GetBrowsingState2(reqCtx, req, grpc.Header(&header), grpc.Trailer(&trailer))
+	if err != nil {
+		return nil, err
+	}
+	responses, payloadBytes, err := collectBrowsingState2Responses(stream)
+	if err != nil {
+		return nil, err
+	}
+	return &BrowsingState2Result{
+		Elapsed:      time.Since(start),
+		Responses:    responses,
+		Header:       header,
+		Trailer:      trailer,
+		PayloadBytes: payloadBytes,
+	}, nil
+}
+
+func collectBrowsingState2Responses(stream pb.DataLoader_GetBrowsingState2Client) ([]*pb.BrowsingStateResponse, int, error) {
+	responses := make([]*pb.BrowsingStateResponse, 0, 64)
+	payloadBytes := 0
+	for {
+		resp, err := stream.Recv()
+		if err != nil {
+			if isStreamEOF(err) {
+				return responses, payloadBytes, nil
+			}
+			return nil, 0, fmt.Errorf("recv GetBrowsingState2: %w", err)
+		}
+		responses = append(responses, resp)
+		payloadBytes += len(resp.String())
+	}
+}

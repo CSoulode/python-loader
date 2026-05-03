@@ -19,6 +19,7 @@ type vectorCacheQuery struct {
 	ModelName   string
 	RefHash     uint64
 	FilterHash  uint64
+	Kind        SearchKind
 	Limit       int32
 	IsRange     bool
 	MinDistance float32
@@ -29,6 +30,7 @@ type cacheKey struct {
 	ModelName  string
 	RefHash    uint64
 	FilterHash uint64
+	Kind       SearchKind
 	IsRange    bool
 	MinBits    uint32
 	MaxBits    uint32
@@ -92,6 +94,15 @@ func (c *VectorSearchCache) TryGetForConfig(
 	return c.tryGet(newCacheQueryFromConfig(cfg, refHash, filterHash), searchKindUnknown)
 }
 
+func (c *VectorSearchCache) TryGetForConfigKind(
+	cfg *pb.VectorSearchDimension,
+	refHash uint64,
+	filterHash uint64,
+	kind SearchKind,
+) (searchResult, bool) {
+	return c.tryGet(newCacheQueryFromConfig(cfg, refHash, filterHash), kind)
+}
+
 func (c *VectorSearchCache) TryGetGlobalKNN(
 	modelName string,
 	refHash uint64,
@@ -112,6 +123,9 @@ func (c *VectorSearchCache) TryGetGlobalForConfig(
 func (c *VectorSearchCache) tryGet(query vectorCacheQuery, requiredKind SearchKind) (searchResult, bool) {
 	if c == nil {
 		return searchResult{}, false
+	}
+	if requiredKind != searchKindUnknown {
+		query.Kind = requiredKind
 	}
 
 	c.mu.Lock()
@@ -187,6 +201,7 @@ func (c *VectorSearchCache) put(query vectorCacheQuery, result searchResult) {
 	if c == nil {
 		return
 	}
+	query.Kind = result.Kind
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -295,6 +310,7 @@ func newCacheKey(query vectorCacheQuery) cacheKey {
 		ModelName:  strings.TrimSpace(query.ModelName),
 		RefHash:    query.RefHash,
 		FilterHash: query.FilterHash,
+		Kind:       query.Kind,
 		IsRange:    query.IsRange,
 		MinBits:    math.Float32bits(query.MinDistance),
 		MaxBits:    math.Float32bits(query.MaxDistance),
@@ -308,6 +324,24 @@ func globalSearchKindForConfig(cfg *pb.VectorSearchDimension) SearchKind {
 	return searchKindGlobalKNN
 }
 
+func filteredSearchKindForConfig(cfg *pb.VectorSearchDimension) SearchKind {
+	if isRangeQuery(cfg) {
+		return searchKindFilteredRange
+	}
+	return searchKindFilteredKNN
+}
+
+func searchKindForStrategy(cfg *pb.VectorSearchDimension, strategy HybridStrategy) SearchKind {
+	switch strategy {
+	case PreFilter:
+		return filteredSearchKindForConfig(cfg)
+	case Hybrid:
+		return searchKindHybridIntersection
+	default:
+		return globalSearchKindForConfig(cfg)
+	}
+}
+
 func entryCanSatisfyQuery(entry *cacheEntry, query vectorCacheQuery) bool {
 	if entry == nil || entry.Query.IsRange != query.IsRange {
 		return false
@@ -315,6 +349,9 @@ func entryCanSatisfyQuery(entry *cacheEntry, query vectorCacheQuery) bool {
 	if entry.Query.ModelName != query.ModelName ||
 		entry.Query.RefHash != query.RefHash ||
 		entry.Query.FilterHash != query.FilterHash {
+		return false
+	}
+	if query.Kind != searchKindUnknown && entry.Query.Kind != query.Kind {
 		return false
 	}
 	if query.Limit > 0 && entry.Query.Limit < query.Limit {

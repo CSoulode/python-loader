@@ -38,7 +38,7 @@ func (s *DataLoaderServer) resolveMultiVectorDimensions(
 		return nil, err
 	}
 	if rebucketOnly {
-		return s.resolveMultiVectorDimensionsFromCache(ctx, dims, filterHash)
+		return s.resolveMultiVectorDimensionsFromCache(ctx, dims, metadataFilters, metadataAxes, filterHash, forcedStrategy)
 	}
 
 	prepared, err := s.prepareMultiVectorDimensions(
@@ -74,6 +74,15 @@ func (s *DataLoaderServer) resolveMultiVectorDimensions(
 			if err != nil {
 				return formatMultiVectorError(index, preparedDim.Config, err)
 			}
+			recordBrowsingStateVectorFragment(
+				groupCtx,
+				preparedDim.Config,
+				preparedDim.RefHash,
+				preparedDim.FilterHash,
+				searchResult,
+				bucketed,
+				preparedDim.Strategy,
+			)
 			results[index] = bucketed
 			return nil
 		})
@@ -87,7 +96,10 @@ func (s *DataLoaderServer) resolveMultiVectorDimensions(
 func (s *DataLoaderServer) resolveMultiVectorDimensionsFromCache(
 	ctx context.Context,
 	dims []*pb.VectorSearchDimension,
+	metadataFilters []qg.ParsedFilter,
+	metadataAxes []qg.ParsedAxis,
 	filterHash uint64,
+	forcedStrategy HybridStrategy,
 ) ([]*vectorDimensionResult, error) {
 	cache := s.ensureVectorCache()
 	results := make([]*vectorDimensionResult, len(dims))
@@ -105,7 +117,18 @@ func (s *DataLoaderServer) resolveMultiVectorDimensionsFromCache(
 			if err != nil {
 				return formatMultiVectorError(index, dim, err)
 			}
-			result, ok := cache.TryGetForConfig(normalizedCfg, refHash, filterHash)
+			strategy := PostFilter
+			if hasMetadataPredicates(metadataFilters, metadataAxes) {
+				modelInfo, err := s.resolveModelInfo(ctx, normalizedCfg.GetModelName())
+				if err != nil {
+					return formatMultiVectorError(index, dim, err)
+				}
+				strategy, err = s.determineVectorStrategy(ctx, normalizedCfg, modelInfo, metadataFilters, metadataAxes, forcedStrategy)
+				if err != nil {
+					return formatMultiVectorError(index, dim, err)
+				}
+			}
+			result, ok := cache.TryGetForConfigKind(normalizedCfg, refHash, filterHash, searchKindForStrategy(normalizedCfg, strategy))
 			if !ok {
 				return formatMultiVectorError(
 					index,
@@ -117,6 +140,8 @@ func (s *DataLoaderServer) resolveMultiVectorDimensionsFromCache(
 			if err != nil {
 				return formatMultiVectorError(index, dim, err)
 			}
+			markBrowsingStateVectorFragmentReuse(ctx)
+			recordBrowsingStateVectorFragment(ctx, normalizedCfg, refHash, filterHash, result, bucketed, strategy)
 			results[index] = bucketed
 			return nil
 		})
@@ -203,6 +228,15 @@ func (s *DataLoaderServer) executePreparedVectorSearch(
 	prepared preparedVectorDimension,
 	candidateIDs []int32,
 ) (searchResult, error) {
+	if fragment, ok := reusableBrowsingStateVectorFragment(
+		ctx,
+		prepared.Config,
+		prepared.RefHash,
+		prepared.FilterHash,
+		searchKindForStrategy(prepared.Config, prepared.Strategy),
+	); ok {
+		return fragment.SearchResult, nil
+	}
 	switch prepared.Strategy {
 	case PreFilter:
 		return s.searchNeighborsInCandidates(ctx, prepared.Config, prepared.Inputs, candidateIDs)

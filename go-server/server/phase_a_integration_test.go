@@ -23,6 +23,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	pb "m3.dataloader/dataloader"
 	kvstorev1 "vectorkv/api/kvstore/v1/gen"
@@ -276,8 +277,10 @@ func cloneFakeNeighbors(neighbors []*kvstorev1.Neighbor) []*kvstorev1.Neighbor {
 		if neighbor == nil {
 			continue
 		}
-		copyNeighbor := *neighbor
-		cloned = append(cloned, &copyNeighbor)
+		copyNeighbor, ok := proto.Clone(neighbor).(*kvstorev1.Neighbor)
+		if ok {
+			cloned = append(cloned, copyNeighbor)
+		}
 	}
 	return cloned
 }

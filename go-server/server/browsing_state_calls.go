@@ -489,7 +489,6 @@ func ExecuteInitializeIdsPlan(ctx context.Context, db *sql.DB, plan *qg.Initiali
 		if len(p.Ids) == 0 {
 			idList[1] = defAxisPos
 		} else {
-			p.Ids = p.Ids
 			return nil
 		}
 
@@ -1787,17 +1786,17 @@ func (s *DataLoaderServer) GetBrowsingState(req *pb.GetBrowsingStateRequest, str
 			return fmt.Errorf("GetBrowsingState failed to execute query: %w", err)
 		}
 		defer rows.Close()
+		columns, err := rows.Columns()
+		if err != nil {
+			return fmt.Errorf("GetBrowsingState failed to inspect columns: %w", err)
+		}
+		withTimeline := len(columns) > 3
 
 		var cubeObjects []*pb.CubeObject
 		for rows.Next() {
-			c := &pb.CubeObject{}
-			var thumb sql.NullString
-			var timelineValue any
-			if err := rows.Scan(&c.Id, &c.FileUri, &thumb, &timelineValue); err != nil {
+			c, err := scanCubeObjectRow(rows, withTimeline)
+			if err != nil {
 				return fmt.Errorf("GetBrowsingState failed to scan row: %w", err)
-			}
-			if thumb.Valid {
-				c.ThumbnailUri = thumb.String
 			}
 			cubeObjects = append(cubeObjects, c)
 		}
@@ -1876,14 +1875,45 @@ func (s *DataLoaderServer) GetBrowsingState(req *pb.GetBrowsingStateRequest, str
 
 func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, stream pb.DataLoader_GetBrowsingState2Server) error {
 	ctx := stream.Context()
+	chainLookup, err := s.prepareBrowsingStateChainGRPC(ctx, req)
+	if err != nil {
+		return err
+	}
+	if replayed, err := s.replayBrowsingStateChainGRPC(chainLookup, stream); replayed || err != nil {
+		return err
+	}
+	var finishInflight func(*StateNode, error)
+	if chainLookup != nil {
+		leader, wait := s.ensureBrowsingStateChain().StartInflight(inflightKeyForLookup(*chainLookup))
+		if !leader {
+			return s.replayInflightBrowsingStateGRPC(chainLookup, wait, stream)
+		}
+		finishInflight = func(node *StateNode, err error) {
+			s.ensureBrowsingStateChain().FinishInflight(inflightKeyForLookup(*chainLookup), node, err)
+		}
+		ctx = contextWithBrowsingStateLookup(ctx, chainLookup)
+	}
+	if err := sendBrowsingStateChainGRPCHeader(stream, chainLookup); err != nil {
+		if finishInflight != nil {
+			finishInflight(nil, err)
+		}
+		return err
+	}
 
 	// ---------- Parse request params ----------
 	plan, err := s.parseBrowsingStateRequest(ctx, req)
 	if err != nil {
+		if finishInflight != nil {
+			finishInflight(nil, err)
+		}
 		return err
 	}
 	if plan == nil {
-		return fmt.Errorf("invalid axis filter order")
+		err := fmt.Errorf("invalid axis filter order")
+		if finishInflight != nil {
+			finishInflight(nil, err)
+		}
+		return err
 	}
 	axisOrder, axisX, axisY, axisZ, filters := plan.AxisOrder, plan.AxisX, plan.AxisY, plan.AxisZ, plan.Filters
 	bucketInfos := newBucketInfoAttacherForPlan(plan)
@@ -1891,6 +1921,7 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 	// ---------- Instrumentation Init ----------
 	// Captures everything from here (sender plumbing, tx begin, query, scan, send).
 	m := NewStreamMetrics("GetBrowsingState2")
+	chainResponses := make([]*pb.BrowsingStateResponse, 0)
 
 	// -----------------------------------------------------------------------------
 	// Sender goroutine plumbing:
@@ -1927,6 +1958,10 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 
 	// helper to enqueue responses safely (handles cancellation + sender failure)
 	enqueue := func(resp *pb.BrowsingStateResponse) error {
+		if chainLookup != nil {
+			chainResponses = append(chainResponses, cloneBrowsingStateResponse(resp))
+		}
+
 		// Fast path: check cancellation/sender failure without blocking.
 		select {
 		case <-ctx.Done():
@@ -1973,6 +2008,18 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 			m.LogSummary("sendErr=true")
 			return sendErr
 		}
+		if chainLookup != nil {
+			start := time.Now()
+			finalizeBrowsingStateObservation(chainLookup)
+			node := s.ensureBrowsingStateChain().PublishNode(*chainLookup, &bsCellGrid{Responses: chainResponses, HasGRPCResponses: true})
+			if finishInflight != nil {
+				finishInflight(node, nil)
+			}
+			sendBrowsingStateChainGRPCTrailer(stream, chainLookup, node)
+			logBrowsingStateChainEvent("publish", chainLookup, len(chainResponses), start)
+		} else if finishInflight != nil {
+			finishInflight(nil, nil)
+		}
 		m.LogSummary("")
 		return nil
 	}
@@ -2003,17 +2050,17 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 			return finish(fmt.Errorf("GetBrowsingState failed to execute query: %w", err))
 		}
 		defer rows.Close()
+		columns, err := rows.Columns()
+		if err != nil {
+			return finish(fmt.Errorf("GetBrowsingState failed to inspect columns: %w", err))
+		}
+		withTimeline := len(columns) > 3
 
 		var cubeObjects []*pb.CubeObject
 		for rows.Next() {
-			c := &pb.CubeObject{}
-			var thumb sql.NullString
-			var timelineValue any
-			if err := rows.Scan(&c.Id, &c.FileUri, &thumb, &timelineValue); err != nil {
+			c, err := scanCubeObjectRow(rows, withTimeline)
+			if err != nil {
 				return finish(fmt.Errorf("GetBrowsingState failed to scan row: %w", err))
-			}
-			if thumb.Valid {
-				c.ThumbnailUri = thumb.String
 			}
 			// Successfully scanned a row
 			atomic.AddInt64(&m.RowsRead, 1)
@@ -2054,13 +2101,13 @@ func (s *DataLoaderServer) GetBrowsingState2(req *pb.GetBrowsingStateRequest, st
 
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
-		return fmt.Errorf("GetBrowsingState2 begin tx: %w", err)
+		return finish(fmt.Errorf("GetBrowsingState2 begin tx: %w", err))
 	}
 	defer func() { _ = tx.Rollback() }()
 
 	if disableHashJoins {
 		if _, err := tx.ExecContext(ctx, "SET LOCAL enable_hashjoin = off"); err != nil {
-			return fmt.Errorf("GetBrowsingState2 set enable_hashjoin=off: %w", err)
+			return finish(fmt.Errorf("GetBrowsingState2 set enable_hashjoin=off: %w", err))
 		}
 	}
 

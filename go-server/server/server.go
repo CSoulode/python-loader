@@ -47,10 +47,13 @@ var (
 
 type DataLoaderServer struct {
 	pb.UnimplementedDataLoaderServer
-	db            *sql.DB
-	vectorFilters *vectorFilterResolver
-	vectorConn    *grpc.ClientConn
-	vectorCache   *VectorSearchCache
+	db             *sql.DB
+	vectorFilters  *vectorFilterResolver
+	vectorConn     *grpc.ClientConn
+	vectorCache    *VectorSearchCache
+	modelInfoCache *vectorModelInfoCache
+	browsingChain  *BrowsingStateChain
+	transitionLog  *TransitionEventLog
 }
 
 func NewDataLoaderServer(ctx context.Context, dbConnStr string, vectorAddr string) (*DataLoaderServer, error) {
@@ -72,11 +75,19 @@ func NewDataLoaderServer(ctx context.Context, dbConnStr string, vectorAddr strin
 		return nil, fmt.Errorf("failed to initialize vector filter client: %w", err)
 	}
 
+	browsingChain := newBrowsingStateChain(defaultBrowsingStateChainMaxNodes, defaultBrowsingStateChainTTL)
+	setBrowsingStateChainForExpvar(browsingChain)
+	transitionLog := newTransitionEventLog(defaultTransitionLogCapacity)
+	setTransitionEventLogForExpvar(transitionLog)
+
 	return &DataLoaderServer{
-		db:            db,
-		vectorFilters: vectorFilters,
-		vectorConn:    vectorConn,
-		vectorCache:   newVectorSearchCache(defaultVectorCacheMaxEntries, defaultVectorCacheTTL),
+		db:             db,
+		vectorFilters:  vectorFilters,
+		vectorConn:     vectorConn,
+		vectorCache:    newVectorSearchCache(defaultVectorCacheMaxEntries, defaultVectorCacheTTL),
+		modelInfoCache: newVectorModelInfoCache(),
+		browsingChain:  browsingChain,
+		transitionLog:  transitionLog,
 	}, nil
 }
 
@@ -453,6 +464,8 @@ func main() {
 	httpMux.HandleFunc("/api/vector/models", GetVectorModelsHandler(server))
 	httpMux.HandleFunc("/api/cell", GetMetaDataCubeCompatCellHandler(server))
 	httpMux.HandleFunc("/api/cell/", GetMetaDataCubeCompatCellHandler(server))
+	httpMux.HandleFunc("/v1/transitions", GetTransitionsHandler(server))
+	httpMux.HandleFunc("/debug/cache/browsing-state/invalidate", GetBrowsingStateChainInvalidationHandler(server))
 
 	// 5) Fallback to the generated gateway for everything else
 	httpMux.Handle("/", gwMux)

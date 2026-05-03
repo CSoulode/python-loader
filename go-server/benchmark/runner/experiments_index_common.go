@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -47,10 +48,13 @@ func (r *BenchRunner) rebuildIndexes(
 		if spec.Precision == benchindex.HalfPrecision && !strings.EqualFold(model.Name, "siglip2") {
 			continue
 		}
+		start := time.Now()
+		log.Printf("BENCH_INDEX rebuild_start dataset=%s model=%s type=%s precision=%s", dataset, model.Name, spec.Type, spec.Precision)
 		result, err := manager.RebuildIndex(ctx, benchmarkIndexModel(model), spec)
 		if err != nil {
 			return nil, fmt.Errorf("%s %s: %w", dataset, model.Name, err)
 		}
+		log.Printf("BENCH_INDEX rebuild_done dataset=%s model=%s type=%s precision=%s elapsed_s=%.3f", dataset, model.Name, spec.Type, spec.Precision, time.Since(start).Seconds())
 		results[model.Name] = result
 		r.addIndexSnapshot(dataset, model, spec, result)
 	}

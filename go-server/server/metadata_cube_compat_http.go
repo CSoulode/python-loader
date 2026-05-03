@@ -878,6 +878,24 @@ func GetMetaDataCubeCompatCellHandler(server *DataLoaderServer) http.HandlerFunc
 			http.Error(w, "server is not configured", http.StatusServiceUnavailable)
 			return
 		}
+		chainLookup, err := server.prepareBrowsingStateChainHTTP(r)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid parameters: %v", err), http.StatusBadRequest)
+			return
+		}
+		if server.replayBrowsingStateChainHTTP(w, chainLookup) {
+			return
+		}
+		if chainLookup != nil {
+			r = r.WithContext(contextWithBrowsingStateLookup(r.Context(), chainLookup))
+			chainLookup.InflightKey = inflightKeyForLookup(*chainLookup)
+			leader, wait := server.ensureBrowsingStateChain().StartInflight(chainLookup.InflightKey)
+			if !leader {
+				server.replayInflightBrowsingStateHTTP(w, chainLookup, wait)
+				return
+			}
+			defer server.ensureBrowsingStateChain().FinishInflight(chainLookup.InflightKey, nil, fmt.Errorf("browsing state request returned before publish"))
+		}
 
 		req := &pb.GetCellRequest{
 			XAxis:    r.URL.Query().Get("xAxis"),
@@ -918,6 +936,11 @@ func GetMetaDataCubeCompatCellHandler(server *DataLoaderServer) http.HandlerFunc
 		}
 
 		rebucketOnly := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("rebucketOnly")), "true")
+		forcedStrategy, err := parseCompatHybridStrategy(compatHybridStrategyQueryValue(r.URL.Query()))
+		if err != nil {
+			http.Error(w, vectorFilterHTTPMessage(err), mapVectorFilterHTTPStatus(err))
+			return
+		}
 		plan := &browsingStateRequestPlan{
 			AxisOrder: buildCompatAxisOrder(axisX, axisY, axisZ, filters),
 			AxisX:     axisX,
@@ -932,7 +955,7 @@ func GetMetaDataCubeCompatCellHandler(server *DataLoaderServer) http.HandlerFunc
 			strings.TrimSpace(req.All) != "",
 			strings.TrimSpace(req.Timeline) != "",
 			rebucketOnly,
-			Auto,
+			forcedStrategy,
 		)
 		if err != nil {
 			http.Error(w, vectorFilterHTTPMessage(err), mapVectorFilterHTTPStatus(err))
@@ -1036,21 +1059,21 @@ func GetMetaDataCubeCompatCellHandler(server *DataLoaderServer) http.HandlerFunc
 		}
 
 		if plan.UseAxisBucketInfos && len(plan.AxisBucketInfos) > 0 {
-			writeJSON(w, http.StatusOK, compatBrowsingStateEnvelope{
+			writeBrowsingStateChainHTTPJSON(w, server, chainLookup, compatBrowsingStateEnvelope{
 				AxisBucketInfos: convertCompatAxisBucketInfos(plan.AxisBucketInfos),
 				Cells:           out,
 			})
 			return
 		}
 		if len(plan.BucketInfos) > 0 {
-			writeJSON(w, http.StatusOK, compatBrowsingStateEnvelope{
+			writeBrowsingStateChainHTTPJSON(w, server, chainLookup, compatBrowsingStateEnvelope{
 				BucketInfos: convertCompatBucketInfos(plan.BucketInfos),
 				Cells:       out,
 			})
 			return
 		}
 
-		writeJSON(w, http.StatusOK, out)
+		writeBrowsingStateChainHTTPJSON(w, server, chainLookup, out)
 	}
 }
 

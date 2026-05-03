@@ -1,6 +1,6 @@
 # Future Experiment Framework Benchmark Tool
 
-`benchmark/cmd/bench` runs experiments `exp1` through `exp9` against managed `vectorkv` and `go-server` processes for the global experiment framework described in `docs/architecture/future_experiment_framework.md`.
+`benchmark/cmd/bench` runs experiments `exp1` through `exp11` against managed `vectorkv` and `go-server` processes for the global experiment framework described in `docs/architecture/future_experiment_framework.md`.
 
 ## Inputs
 
@@ -36,7 +36,19 @@ BENCH_DB_URL_PILOT_94K=postgres://postgres:root@db:5432/emm-cube?sslmode=disable
 go run ./benchmark/cmd/bench \
   --dataset-config=pilot_94k:94346:BENCH_DB_URL_PILOT_94K \
   --datasets=pilot_94k \
-  --experiments=exp2,exp1,exp3,exp4,exp8,exp9,exp5,exp6,exp7
+  --experiments=exp2,exp1,exp3,exp4,exp8,exp9,exp5,exp6,exp7,exp10,exp11
+```
+
+Phase F v2 full pilot main+audit example:
+
+```bash
+cd /workspaces/m3-workspace
+BENCH_DB_URL_PILOT_94K=postgres://postgres:root@db:5432/emm-cube?sslmode=disable \
+DATE_TAG=20260502 \
+MAIN_ROOT=/workspaces/m3-workspace/docs/experiments/future_experiment_framework_pilot_94k_phase_f_v2_20260502 \
+AUDIT_ROOT=/workspaces/m3-workspace/docs/experiments/future_experiment_framework_pilot_94k_phase_f_v2_audit_20260502 \
+REBUILD_BENCH=1 \
+python-loader/go-server/benchmark/scripts/run_future_experiment_framework_pilot.sh
 ```
 
 Sequential main+audit helper:
@@ -53,7 +65,7 @@ Common flags:
 
 - `--datasets=182k,725k`
 - `--dataset-config=label:size:dsn_env[,label:size:dsn_env...]`
-- `--experiments=exp1,exp2,...,exp9`
+- `--experiments=exp1,exp2,...,exp11`
 - `--output-root=/workspaces/m3-workspace/docs/experiments/future_experiment_framework_pilot_94k_20260411`
 - `--go-server-env-file=/workspaces/m3-workspace/python-loader/go-server/.env`
 - `--vector-models-file=/workspaces/m3-workspace/vectorkv/config/models.json`
@@ -92,6 +104,8 @@ If `--output-root` is omitted, the tool derives a dataset-aware root name such a
   - `exp6`: records both generic `plan_used_index` and precise `plan_used_vector_ann_index`
   - `exp8`: range matrix across model, index type, query type, width, and position
   - `exp9`: range + metadata filtering with `query_type`, `ttfb_ms`, `ttlb_ms`, and `selected_strategy`
+  - `exp10`: Phase F v2 state-chain performance, writing `raw/exp_f_chain_perf.csv`
+  - `exp11`: Phase F v2 conditional request and invalidation validation, writing `raw/exp_f_chain_invalidation.csv`
 
 ## Output
 

@@ -209,6 +209,10 @@ func (s *DataLoaderServer) CreateTagSet(ctx context.Context, request *pb.CreateT
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to insert tagset into database: %s", err)
 	}
+	s.invalidateBrowsingStateDependencies(browsingStateDependency{
+		Kind: browsingStateDepTagset,
+		ID:   fmt.Sprint(insertedTagset.Id),
+	})
 
 	return &insertedTagset, nil
 }

@@ -45,8 +45,19 @@ func (s *DataLoaderServer) resolveVectorDimensionForMetadata(
 		if err != nil {
 			return nil, err
 		}
+		strategy := PostFilter
+		if hasMetadataPredicates(metadataFilters, metadataAxes) {
+			modelInfo, err := s.resolveModelInfo(ctx, effectiveCfg.GetModelName())
+			if err != nil {
+				return nil, err
+			}
+			strategy, err = s.determineVectorStrategy(ctx, effectiveCfg, modelInfo, metadataFilters, metadataAxes, forcedStrategy)
+			if err != nil {
+				return nil, err
+			}
+		}
 		modelName := strings.TrimSpace(effectiveCfg.GetModelName())
-		result, ok := cache.TryGetForConfig(effectiveCfg, refHash, filterHash)
+		result, ok := cache.TryGetForConfigKind(effectiveCfg, refHash, filterHash, searchKindForStrategy(effectiveCfg, strategy))
 		if !ok {
 			return nil, status.Error(codes.FailedPrecondition, "rebucket_only: no cached search results for this model+reference+filters; re-send without rebucket_only to trigger a new search")
 		}
@@ -61,6 +72,8 @@ func (s *DataLoaderServer) resolveVectorDimensionForMetadata(
 		if err != nil {
 			return nil, err
 		}
+		markBrowsingStateVectorFragmentReuse(ctx)
+		recordBrowsingStateVectorFragment(ctx, effectiveCfg, refHash, filterHash, result, bucketed, strategy)
 		logBenchmarkEvent(ctx, "bucketing_done", appendVectorQueryBenchmarkFields(map[string]any{
 			"model_name":    modelName,
 			"bucket_count":  len(bucketed.BucketInfos),
@@ -81,6 +94,18 @@ func (s *DataLoaderServer) resolveVectorDimensionForMetadata(
 	if inputs.Config != nil {
 		effectiveCfg = inputs.Config
 	}
+	strategy, err := s.determineVectorStrategy(ctx, effectiveCfg, inputs.ModelInfo, metadataFilters, metadataAxes, forcedStrategy)
+	if err != nil {
+		return nil, err
+	}
+	if fragment, ok := reusableBrowsingStateVectorFragment(ctx, effectiveCfg, refHash, filterHash, searchKindForStrategy(effectiveCfg, strategy)); ok {
+		bucketed, err := bucketSearchResult(effectiveCfg, fragment.SearchResult)
+		if err != nil {
+			return nil, err
+		}
+		recordBrowsingStateVectorFragment(ctx, effectiveCfg, refHash, filterHash, fragment.SearchResult, bucketed, fragment.Strategy)
+		return bucketed, nil
+	}
 	modelName := strings.TrimSpace(effectiveCfg.GetModelName())
 	logBenchmarkEvent(ctx, "vector_cache_miss", appendVectorQueryBenchmarkFields(map[string]any{
 		"model_name":  modelName,
@@ -96,7 +121,7 @@ func (s *DataLoaderServer) resolveVectorDimensionForMetadata(
 		metadataAxes,
 		refHash,
 		filterHash,
-		forcedStrategy,
+		strategy,
 	)
 	if err != nil {
 		return nil, err
@@ -124,6 +149,7 @@ func (s *DataLoaderServer) resolveVectorDimensionForMetadata(
 		"search_kind":  result.Kind.String(),
 		"result_count": len(result.RawNeighbors),
 	}, effectiveCfg))
+	recordBrowsingStateVectorFragment(ctx, effectiveCfg, refHash, filterHash, result, bucketed, strategy)
 	return bucketed, nil
 }
 
@@ -135,20 +161,8 @@ func (s *DataLoaderServer) executeVectorSearchWithStrategy(
 	metadataAxes []qg.ParsedAxis,
 	refHash uint64,
 	filterHash uint64,
-	forcedStrategy HybridStrategy,
+	strategy HybridStrategy,
 ) (searchResult, error) {
-	strategy, err := s.determineVectorStrategy(
-		ctx,
-		cfg,
-		inputs.ModelInfo,
-		metadataFilters,
-		metadataAxes,
-		forcedStrategy,
-	)
-	if err != nil {
-		return searchResult{}, err
-	}
-
 	switch strategy {
 	case PreFilter:
 		candidateIDs, err := s.executeMetadataFilter(ctx, metadataFilters, metadataAxes)
@@ -221,7 +235,12 @@ func (s *DataLoaderServer) executeMetadataFilter(
 	filters []qg.ParsedFilter,
 	axes []qg.ParsedAxis,
 ) ([]int32, error) {
-	sqlStr, err := qg.GenerateCandidateObjectIDs(filters, axes)
+	if ids, ok := reusableBrowsingStateCandidates(ctx); ok {
+		logMetadataFilterReuse(ctx, ids, filters, axes)
+		return ids, nil
+	}
+	scopedFilters, restricted := restrictMetadataFiltersWithBrowsingState(ctx, filters)
+	sqlStr, err := qg.GenerateCandidateObjectIDs(scopedFilters, axes)
 	if err != nil {
 		return nil, fmt.Errorf("candidate extraction sql: %w", err)
 	}
@@ -252,12 +271,46 @@ func (s *DataLoaderServer) executeMetadataFilter(
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	logBenchmarkEvent(ctx, "metadata_filter_done", map[string]any{
+	logMetadataFilterDone(ctx, ids, filters, axes, restricted)
+	recordBrowsingStateCandidates(ctx, ids)
+	return ids, nil
+}
+
+func logMetadataFilterReuse(ctx context.Context, ids []int32, filters []qg.ParsedFilter, axes []qg.ParsedAxis) {
+	logBenchmarkEvent(ctx, "metadata_filter_reuse", map[string]any{
 		"candidate_count": len(ids),
 		"filter_count":    len(filters),
 		"axis_count":      len(axes),
 	})
-	return ids, nil
+}
+
+func restrictMetadataFiltersWithBrowsingState(ctx context.Context, filters []qg.ParsedFilter) ([]qg.ParsedFilter, bool) {
+	ids, ok := browsingStateCandidateRestriction(ctx)
+	if !ok {
+		return filters, false
+	}
+	next := make([]qg.ParsedFilter, 0, len(filters)+1)
+	next = append(next, filters...)
+	next = append(next, qg.ParsedFilter{Type: "objectid", Ids: ids})
+	return next, true
+}
+
+func logMetadataFilterDone(
+	ctx context.Context,
+	ids []int32,
+	filters []qg.ParsedFilter,
+	axes []qg.ParsedAxis,
+	restricted bool,
+) {
+	event := "metadata_filter_done"
+	if restricted {
+		event = "metadata_filter_intersection_done"
+	}
+	logBenchmarkEvent(ctx, event, map[string]any{
+		"candidate_count": len(ids),
+		"filter_count":    len(filters),
+		"axis_count":      len(axes),
+	})
 }
 
 func (s *DataLoaderServer) searchNeighborsInCandidates(
